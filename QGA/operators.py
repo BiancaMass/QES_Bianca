@@ -1,13 +1,14 @@
 import random
 import numpy
 import math
-from deap import base
-from deap import creator
-from deap import tools
 import pandas as pd
+import matplotlib.pyplot as plt
 import ast
 import os.path
 from statistics import mean
+from deap import base
+from deap import creator
+from deap import tools
 from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute, Aer, BasicAer
 from qiskit import IBMQ
 
@@ -98,7 +99,9 @@ def checkBounds(min, max):
                     elif child[i] < min:
                         child[i] = min
             return offspring
+
         return wrapper
+
     return decorator
 
 
@@ -107,7 +110,6 @@ def split(word):
 
 
 def Quantum_Crossover(parent1, parent2, backend_name, best, beta):
-
     if beta < 0 or beta > math.pi / 2:
         raise 'Value Error: beta must be in [0, pi/2]'
     n = int(len(parent1))
@@ -159,7 +161,6 @@ def Quantum_Crossover(parent1, parent2, backend_name, best, beta):
 
 def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, num_marked=5, hof=tools.HallOfFame(1),
               beta=None, backend=None, verbose=False):
-
     # Creating Crossover Operator
     if cx_operator == 'onep':
         toolbox.register('mate', tools.cxOnePoint)
@@ -246,14 +247,14 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
 
         # The population is entirely replaced by the offspring
         # pop = offspring
-        pop[:] = tools.selBest(offspring, pop_size-1)
+        pop[:] = tools.selBest(offspring, pop_size - 1)
         pop.append(elitist)
 
         hof.update(pop) if stats else {}
 
         record = stats.compile(pop) if stats else {}
         # print(record)
-        logbook.record(gen=g+1, **record)
+        logbook.record(gen=g + 1, **record)
         if verbose:
             print('Logbook:', logbook.stream)
     return pop, logbook
@@ -267,10 +268,10 @@ def medium_pd(name, n_gen, cxpb, mtpb, cxop, n_iter):
     for o in range(len(cxop)):
         for c in range(len(cxpb)):
             for m in range(len(mtpb)):
-                for g in range(n_gen+1):
+                for g in range(n_gen + 1):
                     gen_avg, gen_std, gen_min, gen_max = [], [], [], []
                     for j in range(n_iter):
-                        index = (o*len(mtpb)*len(cxpb)+c*len(mtpb)+m)*n_iter+j
+                        index = (o * len(mtpb) * len(cxpb) + c * len(mtpb) + m) * n_iter + j
                         gen_avg.append(ast.literal_eval(df.iloc[index][g])['avg'])
                         gen_std.append(ast.literal_eval(df.iloc[index][g])['std'])
                         gen_min.append(ast.literal_eval(df.iloc[index][g])['min'])
@@ -292,7 +293,6 @@ def medium_pd(name, n_gen, cxpb, mtpb, cxop, n_iter):
 
 # Scrive due file per ogni funzione di benchmark: la simulazione rozza e quella con i dati mediati su n_iter
 def write_csv(ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, cxop, beta=None, backend=None):
-
     toolbox = createToolbox(ind_size=ind_size)
     stats = createStats()
     titles, logbooks, a = [], [], []
@@ -320,7 +320,7 @@ def write_csv(ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, cxop, beta=
         df_log = pd.DataFrame(logbooks[i])
         df_log.to_csv(os.path.join('Tuning', titles[i]), index=False)
     for i in titles:
-        df = medium_pd('Tuning/'+i, n_gen, cxpb, mtpb, cxop, n_iter)
+        df = medium_pd('Tuning/' + i, n_gen, cxpb, mtpb, cxop, n_iter)
         df.to_csv(os.path.join('Tuning', 'medium_' + i))
 
     return df_log, df
@@ -329,18 +329,44 @@ def write_csv(ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, cxop, beta=
 # Cerchiamo gli iperparametri migliori per ogni funzione di benchmark e op di crossover.
 def tuning(test, cxop):
     hp = pd.DataFrame(columns=['Test function', 'Crossover operator', 'cxpb', 'mtpb'])
-    tf, crop, crosspb, mutpb = [], [], [], [],
+    tf, crop, crosspb, mutpb, avg, std, max, min = [], [], [], [], [], [], [], []
     for t in test:
         dataframe = pd.read_csv('Tuning/medium_' + t + '.csv', index_col=0)
         n_rows = len(dataframe.index)
         pase = int(n_rows / len(cxop))
         for i in range(len(cxop)):
-            idx = dataframe.iloc[i*pase:pase*(i+1)]['max'].idxmax()
+            idx = dataframe.iloc[i * pase:pase * (i + 1)]['max'].idxmax()
             tf.append(t)
             crop.append(dataframe.iloc[idx]['cxop'])
             crosspb.append(dataframe.iloc[idx]['cxpb'])
             mutpb.append(dataframe.iloc[idx]['mtpb'])
+            avg.append(dataframe.iloc[idx]['avg'])
+            std.append(dataframe.iloc[idx]['std'])
+            min.append(dataframe.iloc[idx]['min'])
+            max.append(dataframe.iloc[idx]['max'])
         data = pd.DataFrame({'Test function': tf, 'Crossover operator': crop, 'cxpb': crosspb, 'mtpb': mutpb})
         hp = pd.merge(hp, data, how='outer')
     hp.to_csv('Tuning/hp_tuned.csv')
     return hp
+
+
+# Plotting
+def plot(cxop, cxpb, mtpb, n_gen):
+    df = pd.read_csv('Tuning/hp_tuned.csv')
+
+    for i in range(len(df.index)):
+        test_, cxop_, cxpb_, mtpb_ = df.iloc[i]['Test function'], df.iloc[i]['Crossover operator'], \
+                                     df.iloc[i]['cxpb'], df.iloc[i]['mtpb']
+
+        cxop_index, cxpb_index, mtpb_index = cxop.index(cxop_), cxpb.index(cxpb_), mtpb.index(mtpb_)
+        data = pd.read_csv('Tuning/medium_' + test_ + '.csv')
+        starting_row = (mtpb_index + cxpb_index * len(mtpb) + cxop_index * len(mtpb) * len(cxpb)) * (n_gen+1)
+        best = []
+        for j in range(n_gen+1):
+            best.append(data.iloc[starting_row + j]['max'])
+
+        plt.plot([j for j in range(n_gen + 1)], best)
+        plt.title(test_+' - '+cxop_)
+        # plt.text(1, 1, 'cxpb='+str(cxpb_)+'\nmtpb='+str(mtpb_))
+        plt.show()
+    return n_gen
