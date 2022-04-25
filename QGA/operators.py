@@ -33,6 +33,14 @@ def createToolbox(ind_size):
     return toolbox
 
 
+def quartile1(x):
+    return numpy.percentile(x, q=25)
+
+
+def quartile3(x):
+    return numpy.percentile(x, q=75)
+
+
 def createStats():
     # Statistical Features
     stats = tools.Statistics(key=lambda ind: ind.fitness.values)
@@ -40,6 +48,8 @@ def createStats():
     stats.register("std", numpy.std)
     stats.register("min", numpy.min)
     stats.register("max", numpy.max)
+    stats.register("q1", quartile1)
+    stats.register("q3", quartile3)
     return stats
 
 
@@ -99,9 +109,7 @@ def checkBounds(min, max):
                     elif child[i] < min:
                         child[i] = min
             return offspring
-
         return wrapper
-
     return decorator
 
 
@@ -264,30 +272,33 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
 def medium_pd(name, n_gen, cxpb, mtpb, cxop, n_iter):
     df = pd.read_csv(name)
     df_medium = pd.DataFrame(columns=['cxop', 'cxpb', 'mtpb', 'gen', 'avg', 'std', 'min', 'max'])
-    avg, std, min, max, op, mut, cspb, gen = [], [], [], [], [], [], [], []
+    avg, std, min, max, q1, q3, op, mut, cspb, gen = [], [], [], [], [], [], [], [],  [], []
     for o in range(len(cxop)):
         for c in range(len(cxpb)):
             for m in range(len(mtpb)):
                 for g in range(n_gen + 1):
-                    gen_avg, gen_std, gen_min, gen_max = [], [], [], []
+                    gen_avg, gen_std, gen_min, gen_max, gen_q1, gen_q3 = [], [], [], [], [], []
                     for j in range(n_iter):
                         index = (o * len(mtpb) * len(cxpb) + c * len(mtpb) + m) * n_iter + j
                         gen_avg.append(ast.literal_eval(df.iloc[index][g])['avg'])
                         gen_std.append(ast.literal_eval(df.iloc[index][g])['std'])
                         gen_min.append(ast.literal_eval(df.iloc[index][g])['min'])
                         gen_max.append(ast.literal_eval(df.iloc[index][g])['max'])
+                        gen_q1.append(ast.literal_eval(df.iloc[index][g])['q1'])
+                        gen_q3.append(ast.literal_eval(df.iloc[index][g])['q3'])
                     avg.append(mean(gen_avg))
                     std.append(mean(gen_std))
                     min.append(mean(gen_min))
                     max.append(mean(gen_max))
+                    q1.append(mean(gen_q1))
+                    q3.append(mean(gen_q3))
                     op.append(cxop[o])
                     mut.append(mtpb[m])
                     cspb.append(cxpb[c])
                     gen.append(g)
                 df_medium = pd.merge(df_medium, pd.DataFrame({'cxop': op, 'cxpb': cspb, 'mtpb': mut, 'gen': gen,
-                                                              'avg': avg, 'std': std, 'min': min, 'max': max}),
-                                     how='outer')
-
+                                                              'avg': avg, 'std': std, 'min': min, 'max': max, 'q1':q1,
+                                                              'q3':q3}), how='outer')
     return df_medium
 
 
@@ -313,7 +324,6 @@ def write_csv(ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, cxop, beta=
                             a.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                                cx_operator=o, stats=stats, num_marked=5, test=test,
                                                hof=tools.HallOfFame(1))[1])
-
         logbooks.append(a)
 
     for i in range(len(logbooks)):
