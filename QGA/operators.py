@@ -9,8 +9,11 @@ from statistics import mean
 from deap import base
 from deap import creator
 from deap import tools
-from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute, Aer, BasicAer
+from qiskit import QuantumCircuit, QuantumRegister, ClassicalRegister, execute, BasicAer
 from qiskit import IBMQ
+
+IBMQ.enable_account('3a1e44c417a24cfd7ad48ef3a7f9580be5b94fb0964c798bef468426bc6f6961761a3084e081b884a443d40c445497863'
+                    'fdd687953f085b8a95e67d1ca5cce70')
 
 
 def createToolbox(ind_size):
@@ -19,10 +22,8 @@ def createToolbox(ind_size):
     creator.create('Individual', list, fitness=creator.FitnessMax)
     toolbox = base.Toolbox()
     toolbox.register('attr_float', random.uniform, a=-5, b=5)
-    # individuo
     toolbox.register('individual', tools.initRepeat, creator.Individual, toolbox.attr_float,
                      n=ind_size)
-    # popolazione
     toolbox.register('population', tools.initRepeat, list, toolbox.individual)
     ''' The crossover operator will be add in the update function, which have the possibility to choose between 
     classic and quantum ones'''
@@ -93,8 +94,22 @@ def rosenbrock(individual):
     else:
         x = individual.values[:]
     f = 0
-    for i in range(len(x) - 1):
+    for i in range(len(x)-1):
         f += -(100 * (x[i + 1] - x[i] ** 2) ** 2 + (x[i] - 1) ** 2)
+    return f
+
+
+def ackley(individual):
+    if isinstance(individual, list):
+        x = individual[:]
+    else:
+        x = individual.values[:]
+    n = len(x)
+    A, B = 0, 0
+    for i in range(n):
+        A += x[i]**2
+        B += math.cos(2*math.pi*x[i])
+    f = 20*math.exp(-0.2*math.sqrt(A/n)) + math.exp(B/n)-20-math.e
     return f
 
 
@@ -138,19 +153,21 @@ def Quantum_Crossover(parent1, parent2, backend_name, best, beta):
         qc.measure(parents[i], choice[i])
 
     if backend_name == 'fake':
+        # Ideal Simulator without noise
         backend = BasicAer.get_backend('qasm_simulator')
         job = execute(qc, backend, shots=1, seed_simulator=random.randint(1, 150))
         result = job.result()
         counts = result.get_counts()
 
     else:
+
         provider = IBMQ.get_provider(hub='ibm-q', group='open', project='main')
         backend = provider.get_backend(backend_name)
-
         job = execute(qc, backend, shots=1, seed_simulator=random.randint(1, 150))
         result = job.result()
         counts = result.get_counts()
 
+    bit = 0
     for i in counts.keys():
         bit = i
     choices = split(bit)
@@ -200,6 +217,10 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
         toolbox.register('evaluate', rosenbrock)
         # toolbox.decorate("mate", checkBounds(-5.12, 5.12))
         toolbox.decorate("mutate", checkBounds(-5.12, 5.12))
+    elif test == 'ackley':
+        toolbox.register('evaluate', ackley)
+        # toolbox.decorate("mate", checkBounds(-5.12, 5.12))
+        toolbox.decorate("mutate", checkBounds(-32.768, 32.768))
     else:
         raise 'Error: the selected test function is not available'
     # Creating the population
@@ -207,7 +228,7 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
 
     # Defining the Logbook
     logbook = tools.Logbook()
-    logbook.header = ["gen", "nevals"] + (stats.fields if stats else [])
+    logbook.header = ["gen", "best pop"] + (stats.fields if stats else [])
 
     # Evaluate the entire population
     fitness = list(map(toolbox.evaluate, pop))
@@ -217,7 +238,7 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
     hof.update(pop) if stats else {}
 
     record = stats.compile(pop) if stats else {}
-    logbook.record(gen=0, nevals=len(pop), **record)
+    logbook.record(gen=0, **record)
     if verbose:
         print('Logbook:', logbook.stream)
 
@@ -233,7 +254,7 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
         offspring = list(map(toolbox.clone, offspring))
 
         # Apply crossover and mutation on the offspring
-
+        # Even indices: [::2], Odd indices: [1::2]
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
             if random.random() < cxpb:
                 if cx_operator == 'quantum_crossover':
@@ -262,7 +283,7 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
 
         record = stats.compile(pop) if stats else {}
         # print(record)
-        logbook.record(gen=g + 1, **record)
+        logbook.record(gen=g + 1, **record, best_pop=elitist)
         if verbose:
             print('Logbook:', logbook.stream)
     return pop, logbook
@@ -297,8 +318,8 @@ def medium_pd(name, n_gen, cxpb, mtpb, cxop, n_iter):
                     cspb.append(cxpb[c])
                     gen.append(g)
                 df_medium = pd.merge(df_medium, pd.DataFrame({'cxop': op, 'cxpb': cspb, 'mtpb': mut, 'gen': gen,
-                                                              'avg': avg, 'std': std, 'min': min, 'max': max, 'q1':q1,
-                                                              'q3':q3}), how='outer')
+                                                              'avg': avg, 'std': std, 'min': min, 'max': max, 'q1': q1,
+                                                              'q3': q3}), how='outer')
     return df_medium
 
 
@@ -319,6 +340,7 @@ def write_csv(ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, cxop, beta=
                                 a.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                                    cx_operator=o, beta=b, backend=backend, stats=stats, num_marked=5,
                                                    test=test, hof=tools.HallOfFame(1))[1])
+
                     else:
                         for i in range(n_iter):
                             a.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
@@ -326,6 +348,7 @@ def write_csv(ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, cxop, beta=
                                                hof=tools.HallOfFame(1))[1])
         logbooks.append(a)
 
+    df_log, df = pd.DataFrame(), pd.DataFrame()
     for i in range(len(logbooks)):
         df_log = pd.DataFrame(logbooks[i])
         df_log.to_csv(os.path.join('Tuning', titles[i]), index=False)
@@ -361,7 +384,7 @@ def tuning(test, cxop):
 
 
 # Plotting
-def plot(cxop, cxpb, mtpb, n_gen):
+def plot(cxop, cxpb, mtpb):
     df = pd.read_csv('Tuning/hp_tuned.csv')
 
     for i in range(len(df.index)):
@@ -370,13 +393,14 @@ def plot(cxop, cxpb, mtpb, n_gen):
 
         cxop_index, cxpb_index, mtpb_index = cxop.index(cxop_), cxpb.index(cxpb_), mtpb.index(mtpb_)
         data = pd.read_csv('Tuning/medium_' + test_ + '.csv')
+        n_gen = data['gen'].max()
         starting_row = (mtpb_index + cxpb_index * len(mtpb) + cxop_index * len(mtpb) * len(cxpb)) * (n_gen+1)
         best = []
         for j in range(n_gen+1):
             best.append(data.iloc[starting_row + j]['max'])
 
-        plt.plot([j for j in range(n_gen + 1)], best)
+        plt.plot([j for j in range(n_gen+1)], best)
         plt.title(test_+' - '+cxop_)
-        # plt.text(1, 1, 'cxpb='+str(cxpb_)+'\nmtpb='+str(mtpb_))
+        plt.savefig('Tuning/' + test_ + '_' + cxop_ + '.png')
         plt.show()
-    return n_gen
+    return print('Plotting is finished')
