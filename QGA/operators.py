@@ -72,7 +72,7 @@ def schwefel(individual):
         x = individual.values[:]
     f = 0
     for i in range(len(x)):
-        x2 = [elem ** 2 for elem in x]
+        x2 = [elem ** 2 for elem in x[:i]]
         f += -sum(x2)
     return f
 
@@ -276,14 +276,14 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
 
         # The population is entirely replaced by the offspring
         # pop = offspring
-        pop[:] = tools.selBest(offspring, pop_size - 1)
+        pop[:] = tools.selBest(offspring, pop_size-1)
         pop.append(elitist)
 
         hof.update(pop) if stats else {}
 
         record = stats.compile(pop) if stats else {}
         # print(record)
-        logbook.record(gen=g + 1, **record, best_pop=elitist)
+        logbook.record(gen=g+1, **record, best_pop=elitist)
         if verbose:
             print('Logbook:', logbook.stream)
     return pop, logbook
