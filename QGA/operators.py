@@ -256,10 +256,11 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
         toolbox.register("population_guess", initPopulation, list, creator.Individual,
                          '5_bits/nobetatuning/Init_pop/'+test+str(n_iter)+'.json')
         pop = toolbox.population_guess()
-
     else:
         pop = toolbox.clone(pop_init)
+
     pop_init = toolbox.clone(pop)
+    print(pop_init)
 
     # Defining the Logbook
     logbook = tools.Logbook()
@@ -386,6 +387,7 @@ def write_csv(directory, ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, 
                                             test=test, hof=tools.HallOfFame(1)))
                                 Q.append(algo[i][1])
                                 pop_init.append(algo[i][2])
+                                print(pop_init)
                             else:
                                 Q.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                                    cx_operator=o, backend=backend, stats=stats,
@@ -395,20 +397,19 @@ def write_csv(directory, ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, 
                         dataQ.to_csv(os.path.join(directory, test + '_' + o + '.csv'), index=False)
 
                     else:
+                        algo = []
                         for i in range(n_iter):
                             print('Test=', test, ', cxop=', o, ', cxpb=', c, ', mtpb=', m, ', n_iter=', i)
                             '''data.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                                   cx_operator=o, stats=stats, num_marked=5, test=test,
                                                   pop_init='mine', n_iter=i, hof=tools.HallOfFame(1))[1])'''
                             if o == cxop[0] and c == cxpb[0] and m == mtpb[0]:
-                                data.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
+                                algo.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                             cx_operator=o, stats=stats, num_marked=5, test=test,
-                                            hof=tools.HallOfFame(1))[1])
-                                pop_init.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c,
-                                                          mutpb=m, cx_operator=o, stats=stats, num_marked=5, test=test,
-                                                          hof=tools.HallOfFame(1))[2])
+                                            hof=tools.HallOfFame(1)))
+                                data.append(algo[i][1])
+                                pop_init.append(algo[i][2])
                             else:
-
                                 data.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                                       cx_operator=o, stats=stats, num_marked=5, test=test,
                                                       pop_init=pop_init[i], hof=tools.HallOfFame(1))[1])
@@ -527,7 +528,7 @@ def boxplot_best(directory, test, cxop, n_iter):
 
 
 def boxplot(directory, test, cxop, cxpb, mtpb, n_iter):
-    tuned = pd.read_csv(directory+'/hp_tuned.csv')
+    tuned = pd.read_csv(directory+'hp_tuned.csv')
     test_, cxop_, cxpb_, mtpb_ = [], [], [], []
 
     for i in range(len(tuned.index)):
@@ -541,7 +542,7 @@ def boxplot(directory, test, cxop, cxpb, mtpb, n_iter):
     for t in range(len(test)):
         data = []
         for i in range(len(cxop)):
-            df = pd.read_csv(directory+'/' + test[t] + '_' + cxop[i] + '.csv')
+            df = pd.read_csv(directory+'' + test[t] + '_' + cxop[i] + '.csv')
             k_init = n_iter*(len(mtpb)*cxpb_index[t*i+i]+mtpb_index[t*i+i])
             #print(test[t], cxop[i], k_init)
             max_list = []
@@ -550,6 +551,6 @@ def boxplot(directory, test, cxop, cxpb, mtpb, n_iter):
             data.append(max_list)
         plt.boxplot(data, patch_artist=True, labels=cxop, showfliers=False, showmeans=False)
         plt.title(test[t])
-        plt.savefig(directory+'/' + test[t] + '-boxplot.png')
+        plt.savefig(directory+'' + test[t] + '-boxplot.png')
         plt.clf()
     return print('boxplot completed')
