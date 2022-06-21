@@ -15,8 +15,8 @@ from qiskit.providers.aer import AerSimulator
 from qiskit.test.mock import FakeMontreal
 from qiskit import IBMQ, transpile
 
-#IBMQ.enable_account('3a1e44c417a24cfd7ad48ef3a7f9580be5b94fb0964c798bef468426bc6f6961761a3084e081b884a443d40c445497863'
-                    #'fdd687953f085b8a95e67d1ca5cce70')
+IBMQ.enable_account('3a1e44c417a24cfd7ad48ef3a7f9580be5b94fb0964c798bef468426bc6f6961761a3084e081b884a443d40c445497863'
+                    'fdd687953f085b8a95e67d1ca5cce70')
 
 
 def createToolbox(ind_size):
@@ -143,29 +143,25 @@ def checkBounds(min, max):
 def split(word):
     return [char for char in word]
 
-
-def Quantum_Crossover(parent1, parent2, backend_name, best, beta=None):
+def Quantum_Crossover_beta(parent1, parent2, backend_name, best, beta):
     '''if beta < 0 or beta > math.pi / 2:
         raise 'Value Error: beta must be in [0, pi/2]'''
+    beta=0.5
     n = int(len(parent1))
+    parents = QuantumRegister(n, 'parents')
+    choice = ClassicalRegister(n, 'children')
+    qc = QuantumCircuit(parents, choice)
     d1, d2 = [], []
     for i in range(n):
         d1.append(abs(parent1[i] - best[i]))
         d2.append(abs(parent2[i] - best[i]))
-
-    parents = QuantumRegister(n, 'parents')
-    choice = ClassicalRegister(n, 'children')
-    qc = QuantumCircuit(parents, choice)
-    for i in range(n):
         qc.h(parents[i])
-        if d1[i] == 0 and d2[i] == 0:
-            beta = 0
-        else:
-            beta = (d1[i] - d2[i])/(d1[i]+d2[i])
+
         if d1[i] >= d2[i]:
             qc.ry(beta, parents[i])
         else:
             qc.ry(-beta, parents[i])
+
         qc.measure(parents[i], choice[i])
 
     if backend_name == 'fake':
@@ -207,6 +203,114 @@ def Quantum_Crossover(parent1, parent2, backend_name, best, beta=None):
     return child1, child2
 
 
+def Quantum_Crossover(parent1, parent2, backend_name, best, beta):
+    '''if beta < 0 or beta > math.pi / 2:
+        raise 'Value Error: beta must be in [0, pi/2]'''
+    n = int(len(parent1))
+    parents = QuantumRegister(n, 'parents')
+    choice = ClassicalRegister(n, 'children')
+    qc = QuantumCircuit(parents, choice)
+    d1, d2 = [], []
+    for i in range(n):
+        d1.append(abs(parent1[i] - best[i]))
+        d2.append(abs(parent2[i] - best[i]))
+        qc.h(parents[i])
+        if d1[i] == 0 and d2[i] == 0:
+            beta = 0
+        else:
+            beta = (d1[i] - d2[i])/(d1[i]+d2[i])
+        '''if d1[i] >= d2[i]:
+            qc.ry(beta, parents[i])
+        else:
+            qc.ry(-beta, parents[i])'''
+        qc.ry(beta, parents[i])
+        qc.measure(parents[i], choice[i])
+
+    if backend_name == 'fake':
+        # Ideal Simulator without noise
+        backend = BasicAer.get_backend('qasm_simulator')
+        job = execute(qc, backend, shots=1, seed_simulator=random.randint(1, 150))
+        result = job.result()
+        counts = result.get_counts()
+
+    elif backend_name == 'fake_noise':
+        # Simulator with noise
+        backend = FakeMontreal()
+        sim_ideal = AerSimulator()
+        result = sim_ideal.run(transpile(qc, sim_ideal)).result()
+        counts = result.get_counts(0)
+
+    else:
+        provider = IBMQ.get_provider(hub='ibm-q', group='open', project='main')
+        backend = provider.get_backend(backend_name)
+        job = execute(qc, backend, shots=1, seed_simulator=random.randint(1, 150))
+        result = job.result()
+        counts = result.get_counts()
+
+    bit = 0
+    for i in counts.keys():
+        bit = i
+    choices = split(bit)
+    child1, child2 = [], []
+    for i in range(n):
+        if choices[i] == '0':
+            child1.append(parent1[i])
+            child2.append(parent2[i])
+        elif choices[i] == '1':
+            child1.append(parent2[i])
+            child2.append(parent1[i])
+        else:
+            raise 'Crossover Operator Error: bit\'s value does not possible'
+    return child1, child2
+
+def Quantum_Crossover2(parent1, parent2, backend_name, beta=None, best = None):
+    '''if beta < 0 or beta > math.pi / 2:
+        raise 'Value Error: beta must be in [0, pi/2]'''
+    n = int(len(parent1))
+    parents = QuantumRegister(n, 'parents')
+    choice = ClassicalRegister(n, 'children')
+    qc = QuantumCircuit(parents, choice)
+    for i in range(n):
+        qc.h(parents[i])
+        qc.measure(parents[i], choice[i])
+
+    if backend_name == 'fake':
+        # Ideal Simulator without noise
+        backend = BasicAer.get_backend('qasm_simulator')
+        job = execute(qc, backend, shots=1, seed_simulator=random.randint(1, 150))
+        result = job.result()
+        counts = result.get_counts()
+
+    elif backend_name == 'fake_noise':
+        # Simulator with noise
+        backend = FakeMontreal()
+        sim_ideal = AerSimulator()
+        result = sim_ideal.run(transpile(qc, sim_ideal)).result()
+        counts = result.get_counts(0)
+
+    else:
+        provider = IBMQ.get_provider(hub='ibm-q', group='open', project='main')
+        backend = provider.get_backend(backend_name)
+        job = execute(qc, backend, shots=1, seed_simulator=random.randint(1, 150))
+        result = job.result()
+        counts = result.get_counts()
+
+    bit = 0
+    for i in counts.keys():
+        bit = i
+    choices = split(bit)
+    child1, child2 = [], []
+    for i in range(n):
+        child1.append(parent1[i] / 2 + parent2[i] / 2)
+        if choices[i] == '0':
+            child2.append((best[i]+parent1[i])/2)
+        elif choices[i] == '1':
+            child2.append((best[i]+parent2[i])/2)
+        else:
+            raise 'Crossover Operator Error: bit\'s value does not possible'
+    return child1, child2
+
+
 def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, num_marked=5, hof=tools.HallOfFame(1),
               n_iter=None, pop_init=None, beta=None, backend=None, verbose=False):
     # Creating Crossover Operator
@@ -218,10 +322,17 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
         toolbox.register('mate', tools.cxUniform, indpb=0.2)
     elif cx_operator == 'blend':
         toolbox.register('mate', tools.cxBlend, alpha=0.5)
+    elif cx_operator == 'quantum_crossover_beta':
+        toolbox.register('mate', Quantum_Crossover_beta)
+    elif cx_operator == 'quantum_crossover_beta_noise':
+        toolbox.register('mate', Quantum_Crossover_beta)
     elif cx_operator == 'quantum_crossover':
         toolbox.register('mate', Quantum_Crossover)
     elif cx_operator == 'quantum_crossover_noise':
         toolbox.register('mate', Quantum_Crossover)
+    elif cx_operator == 'quantum_crossover2':
+        toolbox.register('mate', Quantum_Crossover2)
+
     else:
         raise 'Error: the selected crossover operator is not available'
 
@@ -254,7 +365,7 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
         pop = toolbox.population(n=pop_size)
     elif pop_init == 'mine':
         toolbox.register("population_guess", initPopulation, list, creator.Individual,
-                         '5_bits/nobetatuning/Init_pop/'+test+str(n_iter)+'.json')
+                         '5_bits/Init_pop/'+test+str(n_iter)+'.json')
         pop = toolbox.population_guess()
     else:
         pop = toolbox.clone(pop_init)
@@ -294,8 +405,11 @@ def updatedGA(toolbox, pop_size, cxpb, mutpb, n_gen, cx_operator, test, stats, n
         # Even indices: [::2], Odd indices: [1::2]
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
             if random.random() < cxpb:
-                if cx_operator == 'quantum_crossover' or cx_operator == 'quantum_crossover_noise':
+                if cx_operator == 'quantum_crossover' or cx_operator == 'quantum_crossover_noise' \
+                        or cx_operator == 'quantum_crossover_beta'or cx_operator == 'quantum_crossover2'\
+                        or cx_operator == 'quantum_crossover_beta_noise':
                     toolbox.mate(child1, child2, backend_name=backend, beta=beta, best=elitist)
+
                 else:
                     toolbox.mate(child1, child2)
                 del child1.fitness.values
@@ -371,30 +485,30 @@ def write_csv(directory, ind_size, pop_size, n_gen, n_iter, test_f, cxpb, mtpb, 
             data, Q = [], []
             for c in cxpb:
                 for m in mtpb:
-                    if o == 'quantum_crossover' or o == 'quantum_crossover_noise':
-                        if o == 'quantum_crossover_noise':
+                    if o == 'quantum_crossover' or o == 'quantum_crossover_noise' \
+                            or o == 'quantum_crossover2'or o == 'quantum_crossover_beta':
+                        if o == 'quantum_crossover_noise' or o == 'quantum_crossover_beta_noise':
                             backend = 'fake_noise'
                         algo = []
                         for i in range(n_iter):
                             print('Test=', test, ', cxop=', o, ', cxpb=', c, ', mtpb=', m, ', n_iter=', i)
-                            '''Q.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
+                            Q.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
                                                cx_operator=o, backend=backend, stats=stats,
                                                num_marked=5, test=test, pop_init='mine', n_iter=i,
-                                               hof=tools.HallOfFame(1))[1])'''
-                            if o == cxop[0] and c == cxpb[0] and m == mtpb[0]:
+                                               hof=tools.HallOfFame(1))[1])
+                            '''if o == cxop[0] and c == cxpb[0] and m == mtpb[0]:
                                 algo.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
-                                            cx_operator=o, backend=backend, stats=stats, num_marked=5,
+                                            cx_operator=o, backend=backend, stats=stats, num_marked=5, beta=beta,
                                             test=test, hof=tools.HallOfFame(1)))
                                 Q.append(algo[i][1])
                                 pop_init.append(algo[i][2])
-                                print(pop_init)
                             else:
                                 Q.append(updatedGA(toolbox=toolbox, pop_size=pop_size, n_gen=n_gen, cxpb=c, mutpb=m,
-                                                   cx_operator=o, backend=backend, stats=stats,
+                                                   cx_operator=o, backend=backend, stats=stats, beta=beta,
                                                    num_marked=5, test=test, pop_init=pop_init[i],
-                                                   hof=tools.HallOfFame(1))[1])
+                                                   hof=tools.HallOfFame(1))[1])'''
                         dataQ = pd.DataFrame(Q)
-                        dataQ.to_csv(os.path.join(directory, test + '_' + o + '.csv'), index=False)
+                        dataQ.to_csv(os.path.join(directory, test + '_' + o + '_noise.csv'), index=False)
 
                     else:
                         algo = []
@@ -528,7 +642,7 @@ def boxplot_best(directory, test, cxop, n_iter):
 
 
 def boxplot(directory, test, cxop, cxpb, mtpb, n_iter):
-    tuned = pd.read_csv(directory+'hp_tuned.csv')
+    tuned = pd.read_csv(directory+'/hp_tuned.csv')
     test_, cxop_, cxpb_, mtpb_ = [], [], [], []
 
     for i in range(len(tuned.index)):
@@ -542,15 +656,17 @@ def boxplot(directory, test, cxop, cxpb, mtpb, n_iter):
     for t in range(len(test)):
         data = []
         for i in range(len(cxop)):
-            df = pd.read_csv(directory+'' + test[t] + '_' + cxop[i] + '.csv')
+            df = pd.read_csv(directory+'/' + test[t] + '_' + cxop[i] + '.csv')
             k_init = n_iter*(len(mtpb)*cxpb_index[t*i+i]+mtpb_index[t*i+i])
             #print(test[t], cxop[i], k_init)
             max_list = []
             for k in range(n_iter):
                 max_list.append(ast.literal_eval(df.iloc[k_init+k, -1])['max'])
             data.append(max_list)
-        plt.boxplot(data, patch_artist=True, labels=cxop, showfliers=False, showmeans=False)
+        lab = ['onep', 'twop', 'uniform', 'blend', 'Q_b', 'Q_1', 'Q_2', 'Q_noise']
+        plt.boxplot(data, patch_artist=True, labels=lab, showfliers=False, showmeans=False)
         plt.title(test[t])
-        plt.savefig(directory+'' + test[t] + '-boxplot.png')
+        plt.xticks(rotation=20)
+        plt.savefig(directory+'/' + test[t] + '-boxplot.png')
         plt.clf()
     return print('boxplot completed')
