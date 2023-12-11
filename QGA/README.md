@@ -1,1 +1,0 @@
-This work is based on classical genetic algorithms, in particular on crossover operators. The purpose of the research is the design of a quantum crossover operator that could in principle improve the performances of the classical on some specific problems.
