@@ -7,15 +7,19 @@ from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
-#np.random.seed(1)
-#random.seed(1)
+np.random.seed(123)
+# random.seed(1)
+
+
 class Qes:
     """
     Hybrid quantum-classical optimization technique, implemented as maximization, for real functions of real variables.
     """
 
-    def __init__(self, dim, g, n_copy, n_max_evaluations, shots, simulator, noise, gpu, obj_function,
-                 min_value_gene, max_value_gene, dtheta, action_weights, multi_action_pb, max_gen_no_improvement,
+    def __init__(self, dim, g, n_copy, n_max_evaluations, shots, simulator, noise, gpu,
+                 obj_function,
+                 min_value_gene, max_value_gene, dtheta, action_weights, multi_action_pb,
+                 max_gen_no_improvement,
                  **kwargs):
         """ Initialization of the population and its settings
         :param dim: integer. Problem size
@@ -54,11 +58,12 @@ class Qes:
         # Number of generations of the classical evolutionary strategy (integer)
         self.n_gen = math.ceil(n_max_evaluations / n_copy)
 
-        # Create the first individual (quantum circuit) composing the 0-th generation of the population
-        # Number of Qubits required (integer)
+        # Create the first individual (quantum circuit) composing the 0-th generation of the
+        # population Number of Qubits required (integer)
         self.n = math.ceil(math.log(self.dim, 2)) + self.g
         # Number of the computational basis states in the n-qubits Hilbert space (integer)
         self.N = 2 ** self.n
+        ### CIRCUIT ###
         qr = QuantumRegister(self.n, 'qubit')
         # cr = ClassicalRegister(self.n, 'bit')
         ind = QuantumCircuit(qr)
@@ -68,7 +73,7 @@ class Qes:
         # Add a random RY rotation gate on a random qubit to break the initial symmetry
         ind.ry(random.random() * 2 * math.pi, random.randint(0, self.n - 1))
         # Best individual in the current generation
-        self.ind = ind
+        self.ind = ind  # a circuit configuration
         # Population (quantum circuits) generated in the current generation from the best qc of the previous one
         self.population = [self.ind]
         # Candidate solution (real-valued vectors) in the current generation
@@ -123,13 +128,14 @@ class Qes:
                     counter = self.multiaction().counting_multi_action + 1
             else:
                 counter = self.multiaction().counting_multi_action + 1
-            self.act_choice = random.choices(['A', 'D', 'S', 'M'], weights=self.action_weights, k=counter)
+            self.act_choice = random.choices(['A', 'D', 'S', 'M'], weights=self.action_weights,
+                                             k=counter)
             angle = random.random() * 2 * math.pi
             gate_list = [qc.rx, qc.ry, qc.rz, qc.rxx, qc.ryy, qc.rzz]
             gate_dict = {'rx': RXGate, 'ry': RYGate, 'rz': RZGate,
                          'rxx': RXXGate, 'ryy': RYYGate, 'rzz': RZZGate}
             position = 0
-            # print('action choice:', self.act_choice, 'for the copy number: ', i)
+            print('action choice:', self.act_choice, 'for the copy number: ', i)
 
             for j in range(counter):
                 if self.act_choice[j] == 'A':
@@ -258,7 +264,7 @@ class Qes:
                 if p[i] > 1 / self.dim:
                     p[i] = (1 / self.dim)
                 individual[i] = ((p[i]) * (self.max_value_gene - self.min_value_gene) * (
-                            self.N - t)) + self.min_value_gene
+                        self.N - t)) + self.min_value_gene
 
             if self.current_gen == 0:
                 self.best_solution.append(individual[:self.dim])
@@ -318,7 +324,7 @@ class Qes:
                 index = np.argmax(self.fitnesses)
                 # print('Fitness:',self.best_fitness)
                 # print('Individuals:', self.best_individuals)
-                if self.fitnesses[index] > self.best_fitness[g-1]:
+                if self.fitnesses[index] > self.best_fitness[g - 1]:
                     print('improvement found')
                     self.best_individuals.append(self.population[index])
                     self.ind = self.population[index]
@@ -335,8 +341,8 @@ class Qes:
                     self.no_improvements += 1
                     self.best_individuals.append(self.ind)
                     self.depth.append(self.ind.depth())
-                    self.best_fitness.append(self.best_fitness[g-1])
-                    self.best_solution.append(self.best_solution[g-1])
+                    self.best_fitness.append(self.best_fitness[g - 1])
+                    self.best_solution.append(self.best_solution[g - 1])
                 # print('best qc:\n', self.ind)
                 print('circuit depth:', self.depth[g])
                 # print('best solution so far:\n', self.best_solution[g])
@@ -368,7 +374,8 @@ class Qes:
     def data(self):
         """ It stores in output all the data required of the algorithm during the evolution"""
         algo = self.evolution()
-        self.output = [algo.best_solution, algo.best_individuals[0], algo.best_individuals[-1], algo.depth,
+        self.output = [algo.best_solution, algo.best_individuals[0], algo.best_individuals[-1],
+                       algo.depth,
                        algo.best_actions, algo.best_fitness,
                        algo.best_fitness[-1]]
         return self
