@@ -10,6 +10,12 @@ from decimal import Decimal, getcontext
 np.random.seed(123)
 # random.seed(1)
 
+# TODO: remove this once done developing
+"""
+Note to the developer: started from Vincenzo's code, integrating GAN
+"""
+
+
 
 class Qes:
     """
@@ -17,13 +23,14 @@ class Qes:
     functions of real variables.
     """
 
-    def __init__(self, dim, g, n_copy, n_max_evaluations, shots, simulator, noise, gpu,
+    def __init__(self, n_qubits, g, n_copy, n_max_evaluations, shots, simulator, noise, gpu,
                  obj_function,
                  min_value_gene, max_value_gene, dtheta, action_weights, multi_action_pb,
                  max_gen_no_improvement,
                  **kwargs):
         """ Initialization of the population and its settings
-        :param dim: integer. Problem size
+        # :param dim: integer. Problem (function) size
+        :param n_qubits: integer. Number of qubits for the circuit
         :param g: integer. Number of garbage qubits
         :param n_copy: integer. Number of individuals generated at each iteration of the evolution strategy
         :param n_max_evaluations: integer. Termination criteria over the number of fitness evaluations
@@ -31,26 +38,29 @@ class Qes:
         :param simulator: string. Qiskit simulator either statevector or qasm
         :param noise: Boolean. True if a noisy simulation is required, False otherwise
         :param gpu: True or False. If True, it simulates quantum circuits on GPUs, otherwise it does not
-        :param obj_function: string. Name of the objective function to minimize
-        :param min_value_gene: float. Lower bound on the domain of the objective function
-        :param max_value_gene: float. Upper bound on the domain of the objective function
+        :param obj_function: string. Name of the objective function to minimize   # TODO: change
+        :param min_value_gene: float. Lower bound on the domain of the objective function   # TODO: change
+        :param max_value_gene: float. Upper bound on the domain of the objective function   # TODO: change
         :param dtheta: float. Maximum displacement for the angle parameter in the mutation action
         :param action_weights: list. Probab (x100) to choose between the 4 possible actions (their sum must be 100)
         :param multi_action_pb: float. Probability to get multiple actions in the same generation
         :param max_gen_no_improvement: integer. Number of generations with no improvements after which some changes will be applied
         :keyword max_depth: integer. It fixes an upper bound on the quantum circuits depth"""
 
-        self.dim = dim
+        # self.dim = dim  #Note: referred to the function size, used to calculate num qubits
+        # Note: now I am directly inputting number of qubits, but I could calculate it based on
+        #  the image size, then I would just input the image dimensions for example.
+        self.n_qubits = n_qubits
         self.g = g
-        self.n_copy = n_copy
+        self.n_copy = n_copy  # number of children
         self.n_max_evaluations = n_max_evaluations
         self.shots = shots
         self.simulator = simulator
         self.gpu = gpu
         self.noise = noise
-        self.obj_function = obj_function
-        self.min_value_gene = min_value_gene
-        self.max_value_gene = max_value_gene
+        self.obj_function = obj_function  # TODO: change
+        self.min_value_gene = min_value_gene  # TODO: change
+        self.max_value_gene = max_value_gene  # TODO: change
         self.dtheta = dtheta
         self.action_weights = action_weights
         self.multi_action_pb = multi_action_pb
@@ -59,23 +69,33 @@ class Qes:
         # Number of generations of the classical evolutionary strategy (integer)
         self.n_gen = math.ceil(n_max_evaluations / n_copy)
 
-        # Create the first individual (quantum circuit) composing the 0-th generation of the
-        # population Number of Qubits required (integer)
-        self.n = math.ceil(math.log(self.dim, 2)) + self.g
-        # Number of the computational basis states in the n-qubits Hilbert space (integer)
-        self.N = 2 ** self.n
+        #######################
+        # CREATE THE 0-TH INDIVIDUAL (QUANTUM CIRCUIT)
+        #######################
+
+        # Calculate the number of qubits (integer) for the circuit
+        # Note: currently an argument of the  function
+        # self.n_qubits = math.ceil(math.log(self.dim, 2)) + self.g
+
+        # Number of the computational basis states in the n_qubits-qubits Hilbert space (integer)
+        self.N = 2 ** self.n_qubits
+
         ### CIRCUIT ###
-        qr = QuantumRegister(self.n, 'qubit')
-        # cr = ClassicalRegister(self.n, 'bit')
+        qr = QuantumRegister(self.n_qubits, 'qubit')
+        # cr = ClassicalRegister(self.n_qubits, 'bit')
         ind = QuantumCircuit(qr)
+
         # Initialize individual by applying H gate on each qubit
-        for _ in range(self.n):
-            ind.h(_)
+        for qbit in range(self.n_qubits):
+            ind.h(qbit)
         # Add a random RY rotation gate on a random qubit to break the initial symmetry
-        ind.ry(random.random() * 2 * math.pi, random.randint(0, self.n - 1))
-        # Best individual in the current generation
-        self.ind = ind  # a circuit configuration
-        # Population (quantum circuits) generated in the current generation from the best qc of the previous one
+        # Note: consider not doing this in early stage of development
+        ind.ry(random.random() * 2 * math.pi, random.randint(0, self.n_qubits - 1))
+
+        # Best individual in the CURRENT generation
+        self.ind = ind  # a circuit configuration - initialized as the basic circuit
+        # Population (quantum circuits) generated in the current generation from the best qc of
+        # the previous one
         self.population = [self.ind]
         # Candidate solution (real-valued vectors) in the current generation
         self.candidate_sol = None
@@ -84,7 +104,8 @@ class Qes:
         # Actions taken in the current generation
         self.act_choice = None
 
-        # Best individuals (quantum circuits) over the generations
+        # Best individuals (quantum circuits) over ALL the generations
+        # At initialization it is the 0-th circuit
         self.best_individuals = [ind]
         # List of circuits depths over the generations
         self.depth = [self.ind.depth()]
@@ -107,28 +128,35 @@ class Qes:
         # Restrict to quantum circuits with a chosen max_depth
         self.max_depth = None
 
+        # Add a max_depth argument if provided with additional arguments (kwargs)
         for max_depth in kwargs.values():
             self.max_depth = max_depth
         # All the algorithm data we need to store
         self.output = None
 
-        # print('Initial quantum circuit:', self.ind)
+        print('Initial quantum circuit:', self.ind)
 
     def action(self):
-        """ It generates n_copy of the individual and apply one of the 4 POSSIBLE ACTIONS(add, delete, swap, mutate) on
-        each of them. Then the new quantum circuits are stored in the attribute 'population' """
+        """ It generates n_copy of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
+        delete, swap, mutate) on each of them. Then the new quantum circuits are stored in the
+        attribute 'population' """
 
         population = []
+        # Copy and modify the circuit as many times as you chose your branching factor to be (
+        # i.e., number of children)
         for i in range(self.n_copy):
-            qc = self.ind.copy()
-            if self.max_depth is not None:
-                if qc.depth() >= self.max_depth - 1:
-                    counter = 1
-                    self.counting_multi_action = 0
+            qc = self.ind.copy()  # Current child (copy)
+            if self.max_depth is not None:  # if user gave a max_depth as input argument
+                if qc.depth() >= self.max_depth - 1:  # if current depth is one step away from max
+                    counter = 1  # set counter to 1, i.e., only apply one action to the circuit
+                    self.counting_multi_action = 0  # to avoid additional actions to be applied
                 else:
+                    # apply *at least* one action
                     counter = self.multiaction().counting_multi_action + 1
             else:
+                # apply *at least* one action
                 counter = self.multiaction().counting_multi_action + 1
+
             self.act_choice = random.choices(['A', 'D', 'S', 'M'], weights=self.action_weights,
                                              k=counter)
             angle = random.random() * 2 * math.pi
@@ -139,8 +167,9 @@ class Qes:
             print('action choice:', self.act_choice, 'for the copy number: ', i)
 
             for j in range(counter):
+
+                # Add a random gate on a random qubit at the end of the parent quantum circuit
                 if self.act_choice[j] == 'A':
-                    "It adds a random gate on a random qubit at the end of the parent quantum circuit"
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
                     choice = random.randint(0, len(gate_list) - 1)
                     if 0 <= choice < 3:
@@ -148,13 +177,13 @@ class Qes:
                     else:
                         gate_list[choice](angle, position[0], position[1])
 
+                # Delete a random gate in a random position of the parent quantum circuit
                 elif self.act_choice[j] == 'D':
-                    "It deletes a random gate in a random position of the parent quantum circuit"
                     position = random.randint(0, len(qc.data) - 1)
                     qc.data.remove(qc.data[position])
 
+                # Remove a gate in a random position and replace it with a new gate randomly chosen
                 elif self.act_choice[j] == 'S':
-                    "It removes a gate in a random position and replace it with a new gate randomly chosen"
                     if len(qc.data) - 1 > 0:
                         position = random.randint(0, len(qc.data) - 2)
                     gate_to_remove = qc.data[position][0]
@@ -190,9 +219,10 @@ class Qes:
                         element_to_add = tuple(element_to_remove)
                         qc.data[position] = element_to_add
 
+                # Choose a gate and change the angle by adding a value between
+                # [theta-dtheta, theta+dtheta]
                 elif self.act_choice[j] == 'M':
-                    "It chooses a gate and changes the angle by adding a value between [theta-dtheta,theta+dtheta]"
-                    to_not_select = 'h'
+                    to_not_select = 'h'  # Note: in current model only Hadamard =! rotation gate
                     check = True
                     gate_to_mute = None
 
@@ -207,13 +237,14 @@ class Qes:
                     element_to_mute[0] = gate_dict[gate_to_mute[0].name](angle_new)
                     element_to_add = tuple(element_to_mute)
                     qc.data[position] = element_to_add
-                "In case of multiactions we are appending more circuits to the population, " \
-                "if you don't want that put the next code line outside of the for loop on counter"
+
+                # In case of multiactions we are appending more circuits to the population,
+                # if you don't want that put the next code line outside of the for loop on counter
             population.append(qc)
         self.population = population
         return self
 
-    def encode(self):
+    def encode(self):  # TODO: adapt to your application
         """
         It transforms a quantum circuit (ind) in a string of real values of length 2^N, where N=len(ind).
         """
@@ -344,9 +375,9 @@ class Qes:
                     self.depth.append(self.ind.depth())
                     self.best_fitness.append(self.best_fitness[g - 1])
                     self.best_solution.append(self.best_solution[g - 1])
-                # print('best qc:\n', self.ind)
+                # print('best qc:\n_qubits', self.ind)
                 print('circuit depth:', self.depth[g])
-                # print('best solution so far:\n', self.best_solution[g])
+                # print('best solution so far:\n_qubits', self.best_solution[g])
 
                 # Add some controls to reduce probabilities to get stuck in local minima: change hyperparameter value
                 if self.no_improvements == self.max_gen_no_improvement:
