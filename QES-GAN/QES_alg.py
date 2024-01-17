@@ -1,3 +1,7 @@
+"""
+Vincenzo's code, edited by Bianca.
+"""
+
 import numpy as np
 import random
 import math
@@ -8,13 +12,6 @@ from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
 np.random.seed(123)
-# random.seed(1)
-
-# TODO: remove this once done developing
-"""
-Note to the developer: started from Vincenzo's code, integrating GAN
-"""
-
 
 
 class Qes:
@@ -35,7 +32,8 @@ class Qes:
         :param n_copy: integer. Number of individuals generated at each iteration of the evolution strategy
         :param n_max_evaluations: integer. Termination criteria over the number of fitness evaluations
         :param shots: integer. Number of executions on a quantum circuit to get the probability distribution
-        :param simulator: string. Qiskit simulator either statevector or qasm
+        :param simulator: string. Qiskit simulator either statevector or qasm (statevector is
+                          without noise)
         :param noise: Boolean. True if a noisy simulation is required, False otherwise
         :param gpu: True or False. If True, it simulates quantum circuits on GPUs, otherwise it does not
         :param obj_function: string. Name of the objective function to minimize   # TODO: change
@@ -248,12 +246,16 @@ class Qes:
         """
         It transforms a quantum circuit (ind) in a string of real values of length 2^N, where N=len(ind).
         """
-        t = self.N - self.dim
+        # N = number of computational basis states (2**n)
+        # dim e' il numero di dimensioni della funzione
+        # prima era che n_qubits = log(dim)
+        t = self.N - self.dim  # question: still not super sure why this is calculated
         if self.simulator == 'statevector':
             self.noise = False
         if self.noise:
-            backend = FakeMumbaiV2()
-            sim = AerSimulator.from_backend(backend)
+            raise NotImplementedError("Noise implementation is currently not supported.")
+            # backend = FakeMumbaiV2()
+            # sim = AerSimulator.from_backend(backend)
         else:
             sim = Aer.get_backend(self.simulator + '_simulator')
         # Setup Gpu
@@ -264,8 +266,11 @@ class Qes:
         self.candidate_sol = []
         # Let qasm be more free because of the shot noise
         if self.simulator == 'qasm':
-            if self.no_improvements > 10:
-                self.population.insert(0, self.best_individuals[-1])
+            # Comment out and comment in the other 2 lines if you want to support noise simulation
+            if self.noise:
+                raise NotImplementedError("Noise implementation is currently not supported.")
+            # if self.no_improvements > 10:
+            #     self.population.insert(0, self.best_individuals[-1])
 
         for j in range(len(self.population)):
             qc = self.population[j].copy()
@@ -273,30 +278,38 @@ class Qes:
 
             # Set up the type of simulator we want to use
             if self.simulator == 'qasm':
-                qc.measure_all()
-                # print(self.shots)
-                job = execute(qc, sim, shots=self.shots, seed_simulator=random.randint(0, 100))
-                result = job.result()
-                counts = result.get_counts()
-                for i in counts.keys():
-                    # Conversion from binary to decimal, considering qiskit writes from the right to the left
-                    getcontext().prec = 20
-                    index = int(i[::-1], 2)
-                    p[index] = Decimal(str(counts[i])) / Decimal(str(self.shots))
+                raise NotImplementedError("Noise implementation is currently not supported.")
+                # qc.measure_all()
+                # # print(self.shots)
+                # job = execute(qc, sim, shots=self.shots, seed_simulator=random.randint(0, 100))
+                # result = job.result()
+                # counts = result.get_counts()
+                # for i in counts.keys():
+                #     # Conversion from binary to decimal, considering qiskit writes from the right to the left
+                #     getcontext().prec = 20
+                #     index = int(i[::-1], 2)
+                #     p[index] = Decimal(str(counts[i])) / Decimal(str(self.shots))
 
+            # Noise-free simulation
             elif self.simulator == 'statevector':
-                job = execute(qc, sim)
-                result = job.result()
+                # Execute the circuit `qc` on the simulator `sim`
+                job = execute(qc, sim)  # Returns a job object (the task of running the circuit on the simulator)
+                result = job.result()  # Retrieves the result of the execution
+                # Extract the state vector of the quantum circuit after its execution
                 statevector = result.get_statevector(qc)
-                for i in range(len(np.asarray(statevector))):
-                    p[i] = np.absolute(statevector[i]) ** 2
+                # Calculate probabilities
+                for i in range(len(np.asarray(statevector))):  # iterate over each element of s.v.
+                    # For each element in the state vector, calculate the probability of the
+                    # corresponding quantum state (the square of the abs. value of its amplitude)
+                    p[i] = np.absolute(statevector[i]) ** 2  # store probs in array `p`
 
             # Apply the 'linear' map between [0,1] and [min_value_gene, max_value_gene]
             for i in range(self.N):
+                # question: why?
                 if p[i] > 1 / self.dim:
                     p[i] = (1 / self.dim)
-                individual[i] = ((p[i]) * (self.max_value_gene - self.min_value_gene) * (
-                        self.N - t)) + self.min_value_gene
+                # individual[i] = ((p[i]) * (self.max_value_gene - self.min_value_gene) * (
+                #         self.N - t)) + self.min_value_gene
 
             if self.current_gen == 0:
                 self.best_solution.append(individual[:self.dim])
@@ -304,40 +317,53 @@ class Qes:
             self.candidate_sol.append(individual[:self.dim])
         return self
 
+
+
+    #  TODO: arrived here
     @property
     def fitness(self):
         """
         It creates the fitness evaluation function for candidate solutions and store it in the attribute .fn
         """
+        # Create an empty list to store calculated fitness values
         self.fitnesses = []
         # print(len(self.candidate_sol))
         # print(self.n_copy)
+
+        # if there are more candidates than chosen number of children
+        # Question: why is this if statement needed? Couldn't it be just the one below?
         if len(self.candidate_sol) > self.n_copy:
-            self.best_fitness[-1] = self.obj_function(self.candidate_sol[0])
+            self.best_fitness[-1] = self.obj_function(self.candidate_sol[0])  # TODO change obj.fun.
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
             del self.population[0]
 
         for i in range(len(self.candidate_sol)):
-            self.fitnesses.append(self.obj_function(self.candidate_sol[i]))
+            self.fitnesses.append(self.obj_function(self.candidate_sol[i]))  # TODO: change obj.fun.
             self.fitness_evaluations += 1
 
         if self.current_gen == 0:
             self.best_fitness.append(self.fitnesses[0])
 
-        # print('Fitness evaluations: ', self.fitness_evaluations)
+        print('Fitness evaluations: ', self.fitness_evaluations)
         return self
 
     def multiaction(self):
-        """ It permits the individuals to get more actions in the same generations depending on multi_action_pb"""
+        """ It permits the individuals to get more actions in the same generations depending
+        on given parameter multi-action probability (multi_action_pb)"""
         self.counting_multi_action = 0
         rand = random.uniform(0, 1)
+        # Question: why set it this way? Repeated many times until random happens to be > m.a.probs.
+        # Note: like this, it does not inrease counting_multi_action with a probability of
+        #  multi_action_pb because it does a series of independent runs. I wrote a code to see
+        #  how much it increased (see script-analysis.py).
         while rand < self.multi_action_pb:
             self.counting_multi_action += 1
             rand = random.uniform(0, 1)
         # print('multiaction counter: ', self.counting_multi_action)
         return self
 
+    # TODO: unpack this function
     def evolution(self):
         """
         Evolutionary Strategy (1,n_copy) over quantum circuits. Maximization
@@ -403,6 +429,7 @@ class Qes:
         print('QES solution: ', self.best_solution[-1])
         return self
 
+    # TODO: adapt this function for storing output data
     def data(self):
         """ It stores in output all the data required of the algorithm during the evolution"""
         algo = self.evolution()
