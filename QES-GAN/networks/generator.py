@@ -22,4 +22,4 @@ class Q_Generator(nn.Module):
         for qbit in range(self.n_qubits):
             qc.h(qbit)
 
-        return qc
+        return qc  # TODO: it should return a batch of images instead
