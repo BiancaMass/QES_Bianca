@@ -2,6 +2,11 @@ import math
 import numpy as np
 import trackhhl.track_qes as track
 
+"""
+The script defines a collection of functions, each representing a different 
+mathematical optimization problem. These are common benchmark functions for optimization problems.
+"""
+
 def sphere(vector):
     fn = sum(-component * component for component in vector)
     return fn

@@ -1,5 +1,10 @@
 import dataclasses
 
+"""
+This Python script defines several classes to represent elements typically found in particle 
+physics experiments, such as in a particle collider.
+"""
+
 @dataclasses.dataclass(frozen=True)
 class Hit:
     hit_id: int

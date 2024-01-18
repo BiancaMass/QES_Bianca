@@ -1,16 +1,16 @@
-import QuantumES as qes
+import QES_alg as qes
 import fitness_functions as test
 import pandas as pd
 import os.path
 
 
 def write(dim, n_iter=10,
-          directory='experiments/test_bianca',
+          directory='output',
           g=1,
           n_copy=10,
           n_max_evaluations=100,
           shots=1024,
-          simulator='qasm',
+          simulator='statevector',
           noise=False,
           gpu=False,
           obj_function=test.sphere,  # TODO: change
