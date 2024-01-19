@@ -50,7 +50,7 @@ def train(dataset, n_data_qubits, n_garbage_qubits, output_dir):
 
     os.makedirs(output_dir, exist_ok=False)
 
-    # TODO: implement a 'if gpu available then use it' statement
+    # Note: implement a 'if gpu available then use it' statement
     device = torch.device("cpu")  #  Note: you can change to GPU if available
 
     n_epochs = training_config.N_EPOCHS
@@ -59,36 +59,48 @@ def train(dataset, n_data_qubits, n_garbage_qubits, output_dir):
 
     # DataLoader from Pytorch to efficiently load and iterate over batches from the given dataset.
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
-    latent_vec = torch.rand(batch_size, n_qubits, device=device)
+    # latent_vec = torch.rand(batch_size, n_qubits, device=device) # TODO: when/if you do training
+    # latent_vec = torch.rand(n_qubits, device=device)
 
     # Note: critic should be pre-trained
     critic = ClassicalCritic(image_shape=(training_config.IMAGE_SIZE, training_config.IMAGE_SIZE))
-    generator = Q_Generator(n_qubits=n_qubits, latent_vector=latent_vec)
+    generator = Q_Generator(n_qubits=n_qubits)
 
     critic = critic.to(device)
     generator = generator.to(device)
 
     # Initialize an Adam optimizer for the generator.
-    #  TODO: now this gives an error because the generator does not have parameters
-    #   either remove the generator training for now or (more complicated) add the parameter
-    #   function for its training. I'd recommend removing the training for now.
-    optimizer_G = Adam(generator.parameters(),
-                       lr=training_config.LR_G,
-                       betas=(training_config.B1,
-                              training_config.B2))
+    #  Note: now this gives an error because the generator does not have parameters
+    #   either remove the generator training for now or add the parameter function for its
+    #   training (more complicated). I'd recommend removing the training for now.
+    # optimizer_G = Adam(generator.parameters(),
+    #                    lr=training_config.LR_G,
+    #                    betas=(training_config.B1,
+    #                           training_config.B2))
 
     # Load model checkpoint for the discriminator (i.e. a pretrained discriminator)
-    # TODO: make sure this file exists
-    critic.load_state_dict(torch.load(output_dir + f"/critic.pt"))
+    critic.load_state_dict(torch.load('./output/' + f"/critic-80.pt"))  # Note: hardcoded for dev.
 
     for i, (real_images, _) in enumerate(dataloader):
+        # each real_images is a batch of images, a tensor of size (batch_size, colorChannels,
+        # width, height)
+
         # Move real images to the specified device.
         real_images = real_images.to(device)
         # latent vector from uniform distribution
+        # latent_vec = torch.rand(n_qubits, device=device)
         latent_vec = torch.rand(batch_size, n_qubits, device=device)
 
-        # Give generator latent vector z to generate images
-        fake_images = generator(latent_vec)  # TODO: generator wont work now
+        fake_images = []
+
+        # Generate as many fake_images as there are real ones in each batch
+        for i in range(batch_size):
+            # Give generator latent vector z to generate images
+            # fake_image = generator(latent_vec[i])
+            # fake_images.append(fake_image)
+
+            print(latent_vec[i])
+
 
         # Compute the critic's predictions for real and fake images.
         real_validity = critic(real_images)  # Real images.
@@ -115,5 +127,5 @@ if __name__ == "__main__":
     image_size = training_config.IMAGE_SIZE
     classes = training_config.CLASSES
     dataset = select_from_dataset(load_mnist(image_size=image_size), 1000, classes)
-    train(dataset, n_data_qubits=training_config.IMAGE_SIZE, n_garbage_qubits=0,
+    train(dataset, n_data_qubits=training_config.N_QUBITS, n_garbage_qubits=0,
           output_dir=training_config.OUTPUT_DIR)
