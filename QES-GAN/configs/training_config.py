@@ -23,8 +23,14 @@ LAMBDA_GP = 10  # Coefficient for the gradient penalty
 ## IMAGE VARIABLES ##
 #####################
 
-IMAGE_SIZE = 14  # TODO: small for developing purposes. Could increase to 28
+IMAGE_SIZE = 28
 CLASSES = [0, 1]  # This only works for MNIST, picks number classes as specified in list
 
 
+#######################
+## CIRCUIT VARIABLES ##
+#######################
+N_PATCHES = 28
+# TODO: insert a control that n_qubits * n_patches = num of pixels
+N_QUBITS = int((IMAGE_SIZE*IMAGE_SIZE) / N_PATCHES)
 
