@@ -1,4 +1,5 @@
 import os
+import math
 from datetime import datetime
 
 # Utils parameters
@@ -23,14 +24,15 @@ LAMBDA_GP = 10  # Coefficient for the gradient penalty
 ## IMAGE VARIABLES ##
 #####################
 
-IMAGE_SIZE = 28
+IMAGE_SIDE = 28
 CLASSES = [0, 1]  # This only works for MNIST, picks number classes as specified in list
-
+N_PIXELS = IMAGE_SIDE ** 2
 
 #######################
 ## CIRCUIT VARIABLES ##
 #######################
 N_PATCHES = 28
-# TODO: insert a control that n_qubits * n_patches = num of pixels
-N_QUBITS = int((IMAGE_SIZE*IMAGE_SIZE) / N_PATCHES)
+PIXELS_PER_PATCH = int(N_PIXELS / N_PATCHES)  # TODO insert a control that this is an integer
+N_ANCILLAS = 1
+N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2))
 
