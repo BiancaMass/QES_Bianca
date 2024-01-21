@@ -318,8 +318,6 @@ class Qes:
         return self
 
 
-
-    #  TODO: arrived here
     @property
     def fitness(self):
         """
@@ -429,7 +427,6 @@ class Qes:
         print('QES solution: ', self.best_solution[-1])
         return self
 
-    # TODO: adapt this function for storing output data
     def data(self):
         """ It stores in output all the data required of the algorithm during the evolution"""
         algo = self.evolution()
