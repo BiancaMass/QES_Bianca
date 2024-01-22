@@ -8,6 +8,7 @@ from qiskit.circuit import Parameter
 
 class Q_Generator(nn.Module):
     # TODO: this will have to become parameterized in order to change ansatz structure each time
+    # TODO: documentation of all functions
     def __init__(self, batch_size, n_patches, n_data_qubits, n_ancillas, image_shape,
                  pixels_per_patch):
         super().__init__()
@@ -71,18 +72,19 @@ class Q_Generator(nn.Module):
     def forward(self, latent_vector):
         # Forward method to output the post_processed_patch
         images_batch = torch.empty((self.batch_size, self.image_shape[0], self.image_shape[1]))
-        for batch_image_num in range(self.batch_size):
+        # Loop across number of batches (total number of output images)
+        for batch_image_index in range(self.batch_size):
             patches = torch.empty((0, self.n_patches))  # store patches of current image
+            # Loop across sub-generators (one generation per patch)
+            # TODO: the issue with this code is that all sub-generators are exactly identical 
+            #  because the difference between patches in the PQWGAN come from the weights, 
+            #  which differ for each sub-generator, while in my case they are all the same generator
             for patch in range(self.n_patches):
-                # TODO: now every patch is the same, you have to change generator structure (like the
-                #  weights of the parameters??) - this is something to think about and understand well
-                #  namely, where does the difference in patch come from.
-
-                current_patch = self.from_probs_to_pixels(latent_vector[batch_image_num])
+                current_patch = self.from_probs_to_pixels(latent_vector[batch_image_index])
                 current_patch = current_patch[:self.pixels_per_patch]
                 # TODO: THIS ASSUMES A PATCH IS A ROW, as it does not take shape into account!!!
                 current_patch = torch.reshape(torch.from_numpy(current_patch), (1, self.pixels_per_patch))
                 patches = torch.cat((current_patch, patches))
-            images_batch[batch_image_num] = patches
+            images_batch[batch_image_index] = patches
 
         return images_batch
