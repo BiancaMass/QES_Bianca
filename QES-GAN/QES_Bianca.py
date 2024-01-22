@@ -11,13 +11,16 @@ from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
+from networks.generator_methods import get_probabilities, from_probs_to_pixels, from_patches_to_images
+
 np.random.seed(123)
 
+
+# TODO: improve documentation
 
 class Qes:
     """
     Hybrid quantum-classical optimization technique
-    # TODO: improve documentation
     """
 
     def __init__(self, n_data_qubits, n_ancilla,
@@ -69,7 +72,8 @@ class Qes:
         ## CIRCUIT PARAMETERS ##
         ########################
         batch_size = 32  # TODO: hard coded
-        latent_vector = np.random.rand(batch_size, self.n_tot_qubits)
+        latent_vector = np.random.rand(batch_size, self.n_tot_qubits)  # TODO: is it okay to
+        # define it here?? how to deal with batches??
 
 
         #######################
@@ -138,11 +142,11 @@ class Qes:
         attribute 'population' """
 
         population = []
-        # Copy and modify the circuit as many times as you chose your branching factor to be (
-        # i.e., number of children)
+        # Copy and modify the circuit as many times as the chosen branching factor (`n_children`)
         for i in range(self.n_children):
-            qc = self.ind.copy()  # Current child (copy)
+            qc = self.ind.copy()  # Current child (copy of the current parent)
             if self.max_depth is not None:  # if user gave a max_depth as input argument
+                # the depth is the length of the critical path (longest sequence of gates)
                 if qc.depth() >= self.max_depth - 1:  # if current depth is one step away from max
                     counter = 1  # set counter to 1, i.e., only apply one action to the circuit
                     self.counting_multi_action = 0  # to avoid additional actions to be applied
@@ -154,7 +158,7 @@ class Qes:
                 counter = self.multiaction().counting_multi_action + 1
 
             self.act_choice = random.choices(['A', 'D', 'S', 'M'], weights=self.action_weights,
-                                             k=counter)
+                                             k=counter)  # outputs a list of k-number of actions
             angle = random.random() * 2 * math.pi
             gate_list = [qc.rx, qc.ry, qc.rz, qc.rxx, qc.ryy, qc.rzz]
             gate_dict = {'rx': RXGate, 'ry': RYGate, 'rz': RZGate,
@@ -162,10 +166,10 @@ class Qes:
             position = 0
             print('action choice:', self.act_choice, 'for the copy number: ', i)
 
-            for j in range(counter):
-
-                # Add a random gate on a random qubit at the end of the parent quantum circuit
+            for j in range(counter):  # go over the selected actions for this one child
+                # ADD a random gate on a random qubit at the end of the parent quantum circuit
                 if self.act_choice[j] == 'A':
+                    # chooses 2 qubits cause for rxx, ryy, rzz you need 2 qubits
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
                     choice = random.randint(0, len(gate_list) - 1)
                     if 0 <= choice < 3:
@@ -173,12 +177,13 @@ class Qes:
                     else:
                         gate_list[choice](angle, position[0], position[1])
 
-                # Delete a random gate in a random position of the parent quantum circuit
+                # DELETE a random gate in a random position of the parent quantum circuit
                 elif self.act_choice[j] == 'D':
                     position = random.randint(0, len(qc.data) - 1)
                     qc.data.remove(qc.data[position])
 
-                # Remove a gate in a random position and replace it with a new gate randomly chosen
+                # SWAP: Remove a gate in a random position and replace it with a new gate randomly
+                # chosen
                 elif self.act_choice[j] == 'S':
                     if len(qc.data) - 1 > 0:
                         position = random.randint(0, len(qc.data) - 2)
@@ -190,19 +195,19 @@ class Qes:
                         n_qubits = 2
                     else:
                         n_qubits = 1
-                    lenght = len(qc.data[position][1])
-                    if lenght == n_qubits:
+                    length = len(qc.data[position][1])
+                    if length == n_qubits:
                         element_to_remove = list(qc.data[position])
                         element_to_remove[0] = gate_to_add
                         element_to_add = tuple(element_to_remove)
                         qc.data[position] = element_to_add
-                    elif lenght > n_qubits:
+                    elif length > n_qubits:
                         element_to_remove = list(qc.data[position])
                         element_to_remove[0] = gate_to_add
                         element_to_remove[1] = [random.choice(qc.data[position][1])]
                         element_to_add = tuple(element_to_remove)
                         qc.data[position] = element_to_add
-                    elif lenght < n_qubits:
+                    elif length < n_qubits:
                         element_to_remove = list(qc.data[position])
                         element_to_remove[0] = gate_to_add
                         qubits_available = []
@@ -215,22 +220,21 @@ class Qes:
                         element_to_add = tuple(element_to_remove)
                         qc.data[position] = element_to_add
 
-                # Choose a gate and change the angle by adding a value between
-                # [theta-dtheta, theta+dtheta]
+                # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
-                    to_not_select = 'h'  # Note: in current model only Hadamard =! rotation gate
+                    to_not_select = 'h'  # because h is not a rotation gate, so cannot be MUTATED
                     check = True
-                    gate_to_mute = None
+                    gate_to_mutate = None
 
                     while check:
                         position = random.choice([i for i in range(len(qc.data))])
-                        gate_to_mute = qc.data[position]
+                        gate_to_mutate = qc.data[position]
 
-                        if gate_to_mute[0].name != to_not_select:
+                        if gate_to_mutate[0].name != to_not_select:
                             check = False
                     angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
-                    element_to_mute = list(gate_to_mute)
-                    element_to_mute[0] = gate_dict[gate_to_mute[0].name](angle_new)
+                    element_to_mute = list(gate_to_mutate)
+                    element_to_mute[0] = gate_dict[gate_to_mutate[0].name](angle_new)
                     element_to_add = tuple(element_to_mute)
                     qc.data[position] = element_to_add
 
@@ -244,10 +248,7 @@ class Qes:
         """
         It transforms a quantum circuit (ind) in a string of real values of length 2^N, where N=len(ind).
         """
-        # N = number of computational basis states (2**n)
-        # dim e' il numero di dimensioni della funzione
-        # prima era che n_qubits = log(dim)
-        t = self.N - self.dim  # question: still not super sure why this is calculated
+        # TODO: re-implement the noise option ? Or remove entirely
         if self.simulator == 'statevector':
             self.noise = False
         if self.noise:
@@ -256,9 +257,10 @@ class Qes:
             # sim = AerSimulator.from_backend(backend)
         else:
             sim = Aer.get_backend(self.simulator + '_simulator')
-        # Setup Gpu
+        # Setup Gpu  # TODO: add condition that if GPU was set but is not available, it goes back
+        #               to CPU and prints a warning that it did that
         if self.gpu:
-            sim.set_options(device='GPU')
+            sim.set_options(device='GPU')  # Check this works with DSDI infrastructure
             print('gpu used')
 
         self.candidate_sol = []
@@ -272,9 +274,10 @@ class Qes:
 
         for j in range(len(self.population)):
             qc = self.population[j].copy()
-            p, individual = np.zeros(self.N), np.zeros(self.N)
+            individual = np.zeros(self.N)
 
             # Set up the type of simulator we want to use
+            # TODO: consider re-implementing this
             if self.simulator == 'qasm':
                 raise NotImplementedError("Noise implementation is currently not supported.")
                 # qc.measure_all()
@@ -288,19 +291,23 @@ class Qes:
                 #     index = int(i[::-1], 2)
                 #     p[index] = Decimal(str(counts[i])) / Decimal(str(self.shots))
 
-            # Noise-free simulation
+            # Statevector simulator
             elif self.simulator == 'statevector':
-                # Execute the circuit `qc` on the simulator `sim`
-                job = execute(qc, sim)  # Returns a job object (the task of running the circuit on the simulator)
-                result = job.result()  # Retrieves the result of the execution
-                # Extract the state vector of the quantum circuit after its execution
-                statevector = result.get_statevector(qc)
-                # Calculate probabilities
-                for i in range(len(np.asarray(statevector))):  # iterate over each element of s.v.
-                    # For each element in the state vector, calculate the probability of the
-                    # corresponding quantum state (the square of the abs. value of its amplitude)
-                    p[i] = np.absolute(statevector[i]) ** 2  # store probs in array `p`
+                # sim = Aer.get_backend('statevector' + '_simulator')  # Note: already defined up
+                p = get_probabilities(quantum_circuit=qc,
+                                      n_tot_qubits=self.n_tot_qubits,
+                                      sim=sim)
+                post_processed_patch = from_probs_to_pixels(latent_vector=...,  # TODO
+                                                            quantum_circuit=qc,
+                                                            n_tot_qubits=self.n_tot_qubits,
+                                                            n_ancillas=self.n_ancilla)
+                images_batch = from_patches_to_images(batch_size=...,        # TODO define upstream
+                                                      image_shape=...,       # TODO define upstream
+                                                      n_patches=...,         # TODO define upstream
+                                                      latent_vector=...,     # TODO define upstream
+                                                      pixels_per_patch=...)  # TODO define upstream
 
+            # TODO: STOPPED HERE
             # Apply the 'linear' map between [0,1] and [min_value_gene, max_value_gene]
             for i in range(self.N):
                 # question: why?
@@ -350,7 +357,7 @@ class Qes:
         self.counting_multi_action = 0
         rand = random.uniform(0, 1)
         # Question: why set it this way? Repeated many times until random happens to be > m.a.probs.
-        # Note: like this, it does not inrease counting_multi_action with a probability of
+        # Note: like this, it does not increase counting_multi_action with a probability of
         #  multi_action_pb because it does a series of independent runs. I wrote a code to see
         #  how much it increased (see script-analysis.py).
         while rand < self.multi_action_pb:
@@ -370,10 +377,10 @@ class Qes:
         for g in range(self.n_gen):
             print('\ngeneration:', g)
             if g == 0:
-                self.encode().fitness
+                self.encode().fitness  # CHECK what this does after modifying fitness()
 
             else:
-                self.action().encode().fitness
+                self.action().encode().fitness  # CHECK what this does after modifying encode()
 
                 index = np.argmax(self.fitnesses)
                 # print('Fitness:',self.best_fitness)
