@@ -28,9 +28,9 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim):
     return p
 
 
-def from_probs_to_pixels(latent_vector, quantum_circuit, n_tot_qubits, n_ancillas):
+def from_probs_to_pixels(latent_vector, quantum_circuit, n_tot_qubits, n_ancillas, sim):
     qc = quantum_circuit(latent_vector)
-    probs = get_probabilities(qc)
+    probs = get_probabilities(quantum_circuit=qc, n_tot_qubits=n_tot_qubits, sim=sim)
     # Exclude the ancilla qubits values
     probs_given_ancilla_0 = probs[:2 ** (n_tot_qubits - n_ancillas)]
     # making sure the sum is exactly 1.0
@@ -41,23 +41,33 @@ def from_probs_to_pixels(latent_vector, quantum_circuit, n_tot_qubits, n_ancilla
     return post_processed_patch
 
 
-def from_patches_to_images(batch_size, image_shape, n_patches, latent_vector, pixels_per_patch):
-    # Forward method to output the post_processed_patch
-    images_batch = torch.empty((batch_size, image_shape[0], image_shape[1]))
-    # Loop across number of batches (total number of output images)
-    for batch_image_index in range(batch_size):
-        patches = torch.empty((0, n_patches))  # store patches of current image
-        # Loop across sub-generators (one generation per patch)
-        # TODO: the issue with this code is that all sub-generators are exactly identical
-        #  because the difference between patches in the PQWGAN come from the weights,
-        #  which differ for each sub-generator, while in my case they are all the same generator
-        for patch in range(n_patches):
-            current_patch = from_probs_to_pixels(latent_vector[batch_image_index])
-            current_patch = current_patch[:pixels_per_patch]
-            # TODO: THIS ASSUMES A PATCH IS A ROW, as it does not take shape into account!!!
-            current_patch = torch.reshape(torch.from_numpy(current_patch),
-                                          (1, pixels_per_patch))
-            patches = torch.cat((current_patch, patches))
-        images_batch[batch_image_index] = patches
+def from_patches_to_image(latent_vector, quantum_circuit, n_tot_qubits, n_ancillas,
+                          n_patches, pixels_per_patch, sim):
+    """
 
-    return images_batch
+    :param latent_vector:
+    :param quantum_circuit:
+    :param n_tot_qubits:
+    :param n_ancillas:
+    :param n_patches:
+    :param pixels_per_patch:
+    :param sim:
+    :return: A single image
+    """
+    final_image = torch.empty((0, n_patches))  # store patches of current image
+    # TODO: the issue with this code is that all sub-generators are exactly identical
+    #  because the difference between patches in the PQWGAN come from the weights,
+    #  which differ for each sub-generator, while in my case they are all the same generator
+    for patch in range(n_patches):
+        current_patch = from_probs_to_pixels(latent_vector=latent_vector,  # latent_vector[n_patches]
+                                             quantum_circuit=quantum_circuit,
+                                             n_tot_qubits=n_tot_qubits,
+                                             n_ancillas=n_ancillas,
+                                             sim=sim)
+        current_patch = current_patch[:pixels_per_patch]
+        # Note: This assumes patch is a row, as it does not take shape into account.
+        current_patch = torch.reshape(torch.from_numpy(current_patch),
+                                      (1, pixels_per_patch))
+        final_image = torch.cat((current_patch, final_image))
+
+    return final_image
