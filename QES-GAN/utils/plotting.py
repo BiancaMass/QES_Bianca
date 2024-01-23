@@ -36,3 +36,33 @@ def plot_image_tensor(image_tensor, rows, cols, figsize=None):
 # Example usage
 # image_tensor is your tensor of images with shape [num_images, height, width]
 # plot_image_tensor(image_tensor, rows=4, cols=5)
+
+
+def plot_tensor(tensor):
+    """
+    Plot a PyTorch tensor of size [28, 28] as an image.
+
+    Args:
+    - tensor (torch.Tensor): A PyTorch tensor of size [28, 28].
+
+    Returns:
+    - None (displays the image plot)
+    """
+    if not isinstance(tensor, torch.Tensor):
+        raise ValueError("Input must be a PyTorch tensor.")
+
+    if tensor.shape != torch.Size([28, 28]):
+        raise ValueError("Input tensor must have size [28, 28].")
+
+    # Convert the tensor to a NumPy array for plotting
+    image = tensor.numpy()
+
+    # Create a figure and plot the image
+    plt.figure(figsize=(5, 5))  # Adjust the figure size as needed
+    plt.imshow(image, cmap='gray')
+    plt.axis('off')  # Hide the axis labels
+    plt.show()
+
+# Example usage:
+# Assuming you have a tensor named 'my_tensor' of size [28, 28]
+# plot_tensor(my_tensor)
