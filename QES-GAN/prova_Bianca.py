@@ -9,7 +9,6 @@ n_data_qubits = training_config.N_DATA_QUBITS
 n_ancilla = training_config.N_ANCILLAS
 image_shape = (training_config.IMAGE_SIDE, training_config.IMAGE_SIDE)
 batch_size = training_config.BATCH_SIZE
-critic_net = ... # todo
 n_children = 12
 n_max_evaluations = 200
 shots = 1000
@@ -24,9 +23,9 @@ max_depth = 20
 
 
 device = torch.device("cpu")
-critic = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
-critic = critic.to(device)
-critic.load_state_dict(torch.load('./output/' + f"/critic-80.pt"))  # Note: hardcoded for dev.
+critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
+critic_net = critic_net.to(device)
+critic_net.load_state_dict(torch.load('./output/' + f"/critic-80.pt"))  # Note: hardcoded for dev.
 
 qes = qes.Qes(n_data_qubits=n_data_qubits,
               n_ancilla=n_ancilla,
