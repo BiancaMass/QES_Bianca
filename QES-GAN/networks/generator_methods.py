@@ -14,11 +14,11 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim):
     # if self.gpu:  # Note: if GPU
     #     sim.set_options(device='GPU')
     #     print('gpu used')
-
+    sim = Aer.get_backend(sim + '_simulator')  # TODO: not the right place to put it, only for
+    # debugging
     job = execute(quantum_circuit, sim)  # Execute the circuit `qc` on the simulator `sim`
     result = job.result()  # Retrieves the result of the execution
-    statevector = result.get_probabilities(quantum_circuit)  # Extract the state vector
-
+    statevector = result.get_statevector(quantum_circuit)
     # Calculate probabilities:
     # Iterate over each element of s.v. For each element, calculate the probability of the
     # corresponding quantum state (the square of the abs. value of its amplitude)
@@ -29,8 +29,7 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim):
 
 
 def from_probs_to_pixels(latent_vector, quantum_circuit, n_tot_qubits, n_ancillas, sim):
-    qc = quantum_circuit(latent_vector)
-    probs = get_probabilities(quantum_circuit=qc, n_tot_qubits=n_tot_qubits, sim=sim)
+    probs = get_probabilities(quantum_circuit=quantum_circuit, n_tot_qubits=n_tot_qubits, sim=sim)
     # Exclude the ancilla qubits values
     probs_given_ancilla_0 = probs[:2 ** (n_tot_qubits - n_ancillas)]
     # making sure the sum is exactly 1.0

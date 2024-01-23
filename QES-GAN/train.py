@@ -53,7 +53,7 @@ def train_GAN(dataset, n_patches, n_data_qubits, n_garbage_qubits,
     os.makedirs(output_dir, exist_ok=False)
 
     # Note: implement a 'if gpu available then use it' statement
-    device = torch.device("cpu")  #  Note: you can change to GPU if available
+    device = torch.device("cpu")
 
     batch_size = training_config.BATCH_SIZE
     n_total_qubits = n_data_qubits + n_garbage_qubits

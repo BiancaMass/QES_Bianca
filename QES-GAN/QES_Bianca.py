@@ -25,6 +25,7 @@ class Qes:
     """
 
     def __init__(self, n_data_qubits, n_ancilla, image_shape,
+                 batch_size, critic_net,
                  n_children, n_max_evaluations,
                  shots, simulator, noise, gpu,
                  dtheta, action_weights, multi_action_pb,
@@ -35,6 +36,8 @@ class Qes:
         :param n_data_qubits: integer. Number of data qubits for the circuit.
         :param n_ancilla: integer. Number of ancilla qubits for the circuit.
         :param image_shape: tuple. weight and height of the image.
+        :param batch_size: int. Batch size to evaluate a qc (how many times to call it for the
+        fitness)
         :param n_children: integer. Number of children for each generation.
         :param n_max_evaluations: integer. Maximum number of times a new generated ansatz is
         evaluated.
@@ -60,6 +63,8 @@ class Qes:
         self.n_pixels = image_shape[0] * image_shape[1]
         self.n_patches = image_shape[0]  # TODO hard coded for now
         self.pixels_per_patch = int(self.n_pixels/self.n_patches)
+        self.batch_size = batch_size
+        self.critic_net = critic_net
 
         self.n_children = n_children
         self.n_max_evaluations = n_max_evaluations
@@ -83,12 +88,12 @@ class Qes:
         self.N = 2 ** self.n_tot_qubits
 
         ### START VANILLA CIRCUIT ###
-        latent_vector = np.random.rand(self.n_tot_qubits)
+        latent_vector_0 = np.random.rand(self.n_tot_qubits)
 
         qc_0 = QuantumCircuit(QuantumRegister(self.n_tot_qubits, 'qubit'))
         # Applying RY rotations based on the latent vector
         for i in range(self.n_tot_qubits):
-            qc_0.ry(latent_vector[i], i)
+            qc_0.ry(latent_vector_0[i], i)
 
         for qbit in range(self.n_tot_qubits):
             qc_0.h(qbit)
@@ -278,7 +283,7 @@ class Qes:
 
         for j in range(len(self.population)):
             qc = self.population[j].copy()
-            individual = np.zeros(self.N)
+            resulting_image, individual = np.zeros(self.n_pixels), np.zeros(self.n_pixels)
 
             # Set up the type of simulator we want to use
             # TODO: consider re-integrating this
@@ -297,23 +302,23 @@ class Qes:
 
             # Statevector simulator
             elif self.simulator == 'statevector':
-                # sim = Aer.get_backend('statevector' + '_simulator')  # Note: already defined up
-                p = get_probabilities(quantum_circuit=qc,
-                                      n_tot_qubits=self.n_tot_qubits,
-                                      sim=sim)
-                images_batch = from_patches_to_image(n_patches=self.n_patches,
-                                                     latent_vector=latent_vector,
-                                                     pixels_per_patch=self.pixels_per_patch)
+                resulting_image = from_patches_to_image(latent_vector=latent_vector,
+                                                        quantum_circuit=qc,
+                                                        n_tot_qubits=self.n_tot_qubits,
+                                                        n_ancillas=self.n_ancilla,
+                                                        n_patches=self.n_patches,
+                                                        pixels_per_patch=self.pixels_per_patch,
+                                                        sim=self.simulator)
 
             if self.current_gen == 0:
-                self.best_solution.append(individual[:self.dim])
+                self.best_solution.append(resulting_image)
 
-            self.candidate_sol.append(individual[:self.dim])
+            self.candidate_sol.append(resulting_image)
         return self
 
 
     @property
-    def fitness(self, generated_images, critic):
+    def fitness(self):
         """
         Evaluates the current quantum circuit based on a pre-trained classical critic (NN).
 
@@ -330,18 +335,29 @@ class Qes:
         # if there are more candidates than chosen number of children
         # Question: why is this if statement needed? Couldn't it be just the one below?
         if len(self.candidate_sol) > self.n_children:
-            # TODO gotta re-structure here because the score is calculated for the
-            #  candidate_solution each time, while for me the actual ansatz is not an input to
-            #  the scoring function atm
-            self.best_fitness[-1] = scoring_function(qc=self.candidate_sol[0],
-                                                     critic=critic)
+            print(self.candidate_sol[0])
+            self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
+                                                     critic=self.critic_net,
+                                                     qc=self.ind,
+                                                     n_tot_qubits=self.n_tot_qubits,
+                                                     n_ancillas=self.n_ancilla,
+                                                     n_patches=self.n_patches,
+                                                     pixels_per_patch=self.pixels_per_patch,
+                                                     sim=self.simulator)
+
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
             del self.population[0]
 
         for i in range(len(self.candidate_sol)):
-            self.fitnesses.append(scoring_function(qc=self.candidate_sol[i],
-                                                   critic=critic))
+            self.fitnesses.append(scoring_function(batch_size=self.batch_size,
+                                                   critic=self.critic_net,
+                                                   qc=self.ind,
+                                                   n_tot_qubits=self.n_tot_qubits,
+                                                   n_ancillas=self.n_ancilla,
+                                                   n_patches=self.n_patches,
+                                                   pixels_per_patch=self.pixels_per_patch,
+                                                   sim=self.simulator))
             # obj.fun.
             self.fitness_evaluations += 1
 
@@ -377,14 +393,11 @@ class Qes:
         for g in range(self.n_generations):
             print('\ngeneration:', g)
             if g == 0:
-                # calculate fitness of ansatz_0
-                # self.encode().fitness  # CHECK what this does after modifying fitness()
-                ...
-                self.encode()
+                self.encode().fitness
 
             else:
-                # perform action funcion on father_ansatz, and then calculate fitness # TODO
-                # self.action().encode().fitness  # CHECK what this does after modifying encode()
+                # perform action on parent_ansatz, and then calculate fitness # TODO
+                self.action().encode().fitness  # CHECK what this does after modifying encode()
 
                 index = np.argmax(self.fitnesses)
                 # print('Fitness:',self.best_fitness)
