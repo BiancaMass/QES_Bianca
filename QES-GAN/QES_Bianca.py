@@ -11,7 +11,8 @@ from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
-from networks.generator_methods import get_probabilities, from_probs_to_pixels, from_patches_to_images
+from networks.generator_methods import get_probabilities, from_probs_to_pixels, from_patches_to_image
+from generator_fitness_function import scoring_function
 
 np.random.seed(123)
 
@@ -23,7 +24,7 @@ class Qes:
     Hybrid quantum-classical optimization technique
     """
 
-    def __init__(self, n_data_qubits, n_ancilla,
+    def __init__(self, n_data_qubits, n_ancilla, image_shape,
                  n_children, n_max_evaluations,
                  shots, simulator, noise, gpu,
                  dtheta, action_weights, multi_action_pb,
@@ -33,6 +34,7 @@ class Qes:
         """ Initialization of the population and its settings
         :param n_data_qubits: integer. Number of data qubits for the circuit.
         :param n_ancilla: integer. Number of ancilla qubits for the circuit.
+        :param image_shape: tuple. weight and height of the image.
         :param n_children: integer. Number of children for each generation.
         :param n_max_evaluations: integer. Maximum number of times a new generated ansatz is
         evaluated.
@@ -53,6 +55,12 @@ class Qes:
         self.n_data_qubits = n_data_qubits
         self.n_ancilla = n_ancilla
         self.n_tot_qubits = n_data_qubits + n_ancilla
+
+        self.image_width, self.image_height = image_shape[0], image_shape[1]
+        self.n_pixels = image_shape[0] * image_shape[1]
+        self.n_patches = image_shape[0]  # TODO hard coded for now
+        self.pixels_per_patch = int(self.n_pixels/self.n_patches)
+
         self.n_children = n_children
         self.n_max_evaluations = n_max_evaluations
         self.shots = shots
@@ -65,16 +73,7 @@ class Qes:
         self.max_gen_no_improvement = max_gen_no_improvement + 1
 
         # Number of generations for the evolution algorithm
-        self.n_gen = math.ceil(n_max_evaluations / n_children)
-
-
-        ########################
-        ## CIRCUIT PARAMETERS ##
-        ########################
-        batch_size = 32  # TODO: hard coded
-        latent_vector = np.random.rand(batch_size, self.n_tot_qubits)  # TODO: is it okay to
-        # define it here?? how to deal with batches??
-
+        self.n_generations = math.ceil(n_max_evaluations / n_children)
 
         #######################
         # CREATE THE 0-TH INDIVIDUAL (QUANTUM CIRCUIT)
@@ -84,6 +83,8 @@ class Qes:
         self.N = 2 ** self.n_tot_qubits
 
         ### START VANILLA CIRCUIT ###
+        latent_vector = np.random.rand(self.n_tot_qubits)
+
         qc_0 = QuantumCircuit(QuantumRegister(self.n_tot_qubits, 'qubit'))
         # Applying RY rotations based on the latent vector
         for i in range(self.n_tot_qubits):
@@ -248,6 +249,9 @@ class Qes:
         """
         It transforms a quantum circuit (ind) in a string of real values of length 2^N, where N=len(ind).
         """
+
+        latent_vector = np.random.rand(self.n_tot_qubits)  # TODO: is this the right place to define it?
+
         # TODO: re-implement the noise option ? Or remove entirely
         if self.simulator == 'statevector':
             self.noise = False
@@ -277,7 +281,7 @@ class Qes:
             individual = np.zeros(self.N)
 
             # Set up the type of simulator we want to use
-            # TODO: consider re-implementing this
+            # TODO: consider re-integrating this
             if self.simulator == 'qasm':
                 raise NotImplementedError("Noise implementation is currently not supported.")
                 # qc.measure_all()
@@ -297,24 +301,9 @@ class Qes:
                 p = get_probabilities(quantum_circuit=qc,
                                       n_tot_qubits=self.n_tot_qubits,
                                       sim=sim)
-                post_processed_patch = from_probs_to_pixels(latent_vector=...,  # TODO
-                                                            quantum_circuit=qc,
-                                                            n_tot_qubits=self.n_tot_qubits,
-                                                            n_ancillas=self.n_ancilla)
-                images_batch = from_patches_to_images(batch_size=...,        # TODO define upstream
-                                                      image_shape=...,       # TODO define upstream
-                                                      n_patches=...,         # TODO define upstream
-                                                      latent_vector=...,     # TODO define upstream
-                                                      pixels_per_patch=...)  # TODO define upstream
-
-            # TODO: STOPPED HERE
-            # Apply the 'linear' map between [0,1] and [min_value_gene, max_value_gene]
-            for i in range(self.N):
-                # question: why?
-                if p[i] > 1 / self.dim:
-                    p[i] = (1 / self.dim)
-                # individual[i] = ((p[i]) * (self.max_value_gene - self.min_value_gene) * (
-                #         self.N - t)) + self.min_value_gene
+                images_batch = from_patches_to_image(n_patches=self.n_patches,
+                                                     latent_vector=latent_vector,
+                                                     pixels_per_patch=self.pixels_per_patch)
 
             if self.current_gen == 0:
                 self.best_solution.append(individual[:self.dim])
@@ -324,9 +313,14 @@ class Qes:
 
 
     @property
-    def fitness(self):
+    def fitness(self, generated_images, critic):
         """
-        It creates the fitness evaluation function for candidate solutions and store it in the attribute .fn
+        Evaluates the current quantum circuit based on a pre-trained classical critic (NN).
+
+        :param generated_images: a batch of images generated by the current ansatz.
+        :param critic: a pre-trained critic neural network to score the batch of generated images.
+
+        :return:
         """
         # Create an empty list to store calculated fitness values
         self.fitnesses = []
@@ -336,13 +330,19 @@ class Qes:
         # if there are more candidates than chosen number of children
         # Question: why is this if statement needed? Couldn't it be just the one below?
         if len(self.candidate_sol) > self.n_children:
-            self.best_fitness[-1] = self.obj_function(self.candidate_sol[0])  # TODO change obj.fun.
+            # TODO gotta re-structure here because the score is calculated for the
+            #  candidate_solution each time, while for me the actual ansatz is not an input to
+            #  the scoring function atm
+            self.best_fitness[-1] = scoring_function(qc=self.candidate_sol[0],
+                                                     critic=critic)
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
             del self.population[0]
 
         for i in range(len(self.candidate_sol)):
-            self.fitnesses.append(self.obj_function(self.candidate_sol[i]))  # TODO: change obj.fun.
+            self.fitnesses.append(scoring_function(qc=self.candidate_sol[i],
+                                                   critic=critic))
+            # obj.fun.
             self.fitness_evaluations += 1
 
         if self.current_gen == 0:
@@ -374,13 +374,17 @@ class Qes:
         self.best_actions = []
         action_weights = self.action_weights
         theta_default = self.dtheta
-        for g in range(self.n_gen):
+        for g in range(self.n_generations):
             print('\ngeneration:', g)
             if g == 0:
-                self.encode().fitness  # CHECK what this does after modifying fitness()
+                # calculate fitness of ansatz_0
+                # self.encode().fitness  # CHECK what this does after modifying fitness()
+                ...
+                self.encode()
 
             else:
-                self.action().encode().fitness  # CHECK what this does after modifying encode()
+                # perform action funcion on father_ansatz, and then calculate fitness # TODO
+                # self.action().encode().fitness  # CHECK what this does after modifying encode()
 
                 index = np.argmax(self.fitnesses)
                 # print('Fitness:',self.best_fitness)
