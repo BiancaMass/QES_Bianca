@@ -349,7 +349,7 @@ class Qes:
             del self.candidate_sol[0]
             del self.population[0]
 
-        for i in range(len(self.candidate_sol)):
+        for i in range(len(self.candidate_sol)):  # should this be population instead?
             self.fitnesses.append(scoring_function(batch_size=self.batch_size,
                                                    critic=self.critic_net,
                                                    qc=self.ind,
@@ -358,6 +358,7 @@ class Qes:
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
                                                    sim=self.simulator))
+            print(self.fitnesses)
             # obj.fun.
             self.fitness_evaluations += 1
 
@@ -421,9 +422,9 @@ class Qes:
                     self.depth.append(self.ind.depth())
                     self.best_fitness.append(self.best_fitness[g - 1])
                     self.best_solution.append(self.best_solution[g - 1])
-                # print('best qc:\n_qubits', self.ind)
+                print('best qc:\n_qubits', self.ind)
                 print('circuit depth:', self.depth[g])
-                # print('best solution so far:\n_qubits', self.best_solution[g])
+                print('best solution so far:\n_qubits', self.best_solution[g])
 
                 # Add some controls to reduce probabilities to get stuck in local minima: change hyperparameter value
                 if self.no_improvements == self.max_gen_no_improvement:
