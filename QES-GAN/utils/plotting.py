@@ -4,7 +4,7 @@ import torch
 
 def plot_image_tensor(image_tensor, rows, cols, figsize=None):
     """
-    Plots images from a 3D tensor.
+    Plots multiple images from a 3D tensor.
 
     Args:
         image_tensor (torch.Tensor): A 3D tensor containing images (shape: num_images x height x width).

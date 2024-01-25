@@ -18,6 +18,10 @@ np.random.seed(123)
 
 
 # TODO: improve documentation
+# Found issue: the latent vector is never given to the new circuits. This needs to be changes.
+# So, right now I define a circuit with an initial latent vector and change the gates (inlcuding
+# the encoding gates) but instead I should keep the encoding gates, change the latent vector,
+# and change the other gates with the evolutionary algorithm.
 
 class Qes:
     """
@@ -258,6 +262,7 @@ class Qes:
         latent_vector = np.random.rand(self.n_tot_qubits)  # TODO: is this the right place to define it?
 
         # TODO: re-implement the noise option ? Or remove entirely
+        # TODO: the simulator name should be given fully to the functions,  not
         if self.simulator == 'statevector':
             self.noise = False
         if self.noise:
@@ -302,8 +307,7 @@ class Qes:
 
             # Statevector simulator
             elif self.simulator == 'statevector':
-                resulting_image = from_patches_to_image(latent_vector=latent_vector,
-                                                        quantum_circuit=qc,
+                resulting_image = from_patches_to_image(quantum_circuit=qc,
                                                         n_tot_qubits=self.n_tot_qubits,
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
