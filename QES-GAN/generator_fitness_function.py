@@ -52,8 +52,7 @@ def scoring_function(batch_size, critic, qc,
     latent_vector = np.random.rand(batch_size, n_tot_qubits)
     generated_images = []
     for batch_index in range(batch_size):
-        generated_image = from_patches_to_image(latent_vector=latent_vector[batch_index],
-                                                quantum_circuit=qc,
+        generated_image = from_patches_to_image(quantum_circuit=qc,
                                                 n_tot_qubits=n_tot_qubits,
                                                 n_ancillas=n_ancillas,
                                                 n_patches=n_patches,
