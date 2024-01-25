@@ -36,7 +36,9 @@ from networks.generator import Q_Generator
 from utils.gradient_penalty import compute_gradient_penalty
 
 
-def train(dataset, n_data_qubits, n_garbage_qubits, output_dir):
+def train_GAN(dataset, n_patches, n_data_qubits, n_garbage_qubits,
+              output_dir):
+    # TODO: this is not actually training so consider changing function name
     """
 
     :param dataset:
@@ -51,62 +53,52 @@ def train(dataset, n_data_qubits, n_garbage_qubits, output_dir):
     os.makedirs(output_dir, exist_ok=False)
 
     # Note: implement a 'if gpu available then use it' statement
-    device = torch.device("cpu")  #  Note: you can change to GPU if available
+    device = torch.device("cpu")
 
-    n_epochs = training_config.N_EPOCHS
     batch_size = training_config.BATCH_SIZE
-    n_qubits = n_data_qubits + n_garbage_qubits
+    n_total_qubits = n_data_qubits + n_garbage_qubits
+    n_patches = n_patches
 
     # DataLoader from Pytorch to efficiently load and iterate over batches from the given dataset.
+    print("Loading Dataset")
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
-    # latent_vec = torch.rand(batch_size, n_qubits, device=device) # TODO: when/if you do training
-    # latent_vec = torch.rand(n_qubits, device=device)
 
-    # Note: critic should be pre-trained
-    critic = ClassicalCritic(image_shape=(training_config.IMAGE_SIZE, training_config.IMAGE_SIZE))
-    generator = Q_Generator(n_qubits=n_qubits)
+    # Note: critic should be pre-trained (or use another function to score the ansatz)
+    critic = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
+    generator = Q_Generator(batch_size=batch_size,
+                            n_patches=n_patches,
+                            n_data_qubits=n_data_qubits,
+                            n_ancillas=n_garbage_qubits,
+                            image_shape=(training_config.IMAGE_SIDE,training_config.IMAGE_SIDE),
+                            pixels_per_patch=training_config.PIXELS_PER_PATCH)
 
     critic = critic.to(device)
     generator = generator.to(device)
 
-    # Initialize an Adam optimizer for the generator.
-    #  Note: now this gives an error because the generator does not have parameters
-    #   either remove the generator training for now or add the parameter function for its
-    #   training (more complicated). I'd recommend removing the training for now.
-    # optimizer_G = Adam(generator.parameters(),
-    #                    lr=training_config.LR_G,
-    #                    betas=(training_config.B1,
-    #                           training_config.B2))
-
     # Load model checkpoint for the discriminator (i.e. a pretrained discriminator)
+    # Note: you can consider using another cost function and not a critic in the evolutionary
+    #  process
     critic.load_state_dict(torch.load('./output/' + f"/critic-80.pt"))  # Note: hardcoded for dev.
 
     for i, (real_images, _) in enumerate(dataloader):
-        # each real_images is a batch of images, a tensor of size (batch_size, colorChannels,
-        # width, height)
+        # each real_images is a batch of images, a tensor of size
+        # (batch_size, colorChannels, width, height)
 
         # Move real images to the specified device.
         real_images = real_images.to(device)
         # latent vector from uniform distribution
         # latent_vec = torch.rand(n_qubits, device=device)
-        latent_vec = torch.rand(batch_size, n_qubits, device=device)
+        latent_vec = torch.rand(batch_size, n_total_qubits, device=device)
 
-        fake_images = []
-
-        # Generate as many fake_images as there are real ones in each batch
-        for i in range(batch_size):
-            # Give generator latent vector z to generate images
-            # fake_image = generator(latent_vec[i])
-            # fake_images.append(fake_image)
-
-            print(latent_vec[i])
-
+        # Generate fake_images by giving the a generator latent vector z
+        fake_images = generator(latent_vec)
 
         # Compute the critic's predictions for real and fake images.
         real_validity = critic(real_images)  # Real images.
         fake_validity = critic(fake_images)  # Fake images.
 
         # Calculate the gradient penalty and adversarial loss.
+        # TODO: error here
         gradient_penalty = compute_gradient_penalty(critic, real_images, fake_images, device)
         d_loss = -torch.mean(real_validity) + torch.mean(
             fake_validity) + training_config.LAMBDA_GP * gradient_penalty
@@ -114,7 +106,7 @@ def train(dataset, n_data_qubits, n_garbage_qubits, output_dir):
         # Calculate Wasserstein distance - this is the score of how good the generation was
         wasserstein_distance = torch.mean(real_validity) - torch.mean(fake_validity)
 
-        # TODO: this would be the time to train the generator before the evolution routine
+        # Note: this would be the time to train the generator before the evolution routine
 
         pass
 
@@ -124,8 +116,13 @@ def train(dataset, n_data_qubits, n_garbage_qubits, output_dir):
 
 
 if __name__ == "__main__":
-    image_size = training_config.IMAGE_SIZE
+    image_size = training_config.IMAGE_SIDE
     classes = training_config.CLASSES
     dataset = select_from_dataset(load_mnist(image_size=image_size), 1000, classes)
-    train(dataset, n_data_qubits=training_config.N_QUBITS, n_garbage_qubits=0,
-          output_dir=training_config.OUTPUT_DIR)
+    n_patches = training_config.N_PATCHES
+    train_GAN(dataset,
+              n_data_qubits=training_config.N_DATA_QUBITS,
+              n_garbage_qubits=training_config.N_ANCILLAS,
+              n_patches=n_patches,
+              output_dir=training_config.OUTPUT_DIR)
+

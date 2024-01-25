@@ -7,29 +7,38 @@ from qiskit.circuit import Parameter
 
 
 class Q_Generator(nn.Module):
-    def __init__(self, n_qubits):
+    # TODO: this will have to become parameterized in order to change ansatz structure each time
+    # TODO: documentation of all functions
+    def __init__(self, batch_size, n_patches, n_data_qubits, n_ancillas, image_shape,
+                 pixels_per_patch):
         super().__init__()
-        self.n_qubits = n_qubits
+        self.batch_size = batch_size
+        self.n_data_qubits = n_data_qubits
+        self.n_patches = n_patches
+        self.n_tot_qubits = n_data_qubits + n_ancillas
+        self.n_ancillas = n_ancillas
+        self.image_shape = image_shape
+        self.pixels_per_patch = pixels_per_patch
 
     def q_circuit(self, latent_vector):
-        # Create a quantum circuit with n_qubits
-        qc = QuantumCircuit(QuantumRegister(self.n_qubits, 'qubit'))
+        # Create a quantum circuit with n_tot_qubits
+        qc = QuantumCircuit(QuantumRegister(self.n_tot_qubits, 'qubit'))
 
         # Ensure latent_vector elements are in the correct format
         if isinstance(latent_vector, torch.Tensor):
             latent_vector = latent_vector.detach().cpu().numpy().tolist()
 
         # Applying RY rotations based on the latent vector
-        for i in range(self.n_qubits):
+        for i in range(self.n_tot_qubits):
             qc.ry(latent_vector[i], i)
 
-        for qbit in range(self.n_qubits):
+        for qbit in range(self.n_tot_qubits):
             qc.h(qbit)
 
         return qc
 
     def get_statevector(self, qc):
-        p = np.zeros(2 ** self.n_qubits)
+        p = np.zeros(2 ** self.n_tot_qubits)
         sim = Aer.get_backend('statevector' + '_simulator')  # Note: hard coded
 
         # if self.gpu:  # Note: if GPU
@@ -40,27 +49,42 @@ class Q_Generator(nn.Module):
         result = job.result()   # Retrieves the result of the execution
         statevector = result.get_statevector(qc)  # Extract the state vector
 
-        # Calculate probabilities
-        for i in range(len(np.asarray(statevector))):  # iterate over each element of s.v.
-            # For each element in the state vector, calculate the probability of the
-            # corresponding quantum state (the square of the abs. value of its amplitude)
+        # Calculate probabilities:
+        # Iterate over each element of s.v. For each element, calculate the probability of the
+        # corresponding quantum state (the square of the abs. value of its amplitude)
+        for i in range(len(np.asarray(statevector))):
             p[i] = np.absolute(statevector[i]) ** 2  # store probs in array `p`
 
         return p
 
-    def from_probs_to_image(self, latent_vector):
+    def from_probs_to_pixels(self, latent_vector):
         qc = self.q_circuit(latent_vector)
         probs = self.get_statevector(qc)
-        # probs_given_ancilla_0 = probs[:2 ** (self.n_qubits - self.n_ancillas)]
-        # post_measurement_probs = probs_given_ancilla_0 / torch.sum(probs_given_ancilla_0)
-
-        post_measurement_probs = torch.tensor(probs) / torch.sum(probs)
+        # Exclude the ancilla qubits values
+        probs_given_ancilla_0 = probs[:2 ** (self.n_tot_qubits - self.n_ancillas)]
+        # making sure the sum is exactly 1.0
+        post_measurement_probs = probs_given_ancilla_0 / sum(probs_given_ancilla_0)
 
         # normalise image between [-1, 1]
-        post_processed_patch = ((post_measurement_probs / torch.max(
-            post_measurement_probs)) - 0.5) * 2
+        post_processed_patch = ((post_measurement_probs / max(post_measurement_probs)) - 0.5) * 2
         return post_processed_patch
 
     def forward(self, latent_vector):
         # Forward method to output the post_processed_patch
-        return self.from_probs_to_image(latent_vector)
+        images_batch = torch.empty((self.batch_size, self.image_shape[0], self.image_shape[1]))
+        # Loop across number of batches (total number of output images)
+        for batch_image_index in range(self.batch_size):
+            patches = torch.empty((0, self.n_patches))  # store patches of current image
+            # Loop across sub-generators (one generation per patch)
+            # TODO: the issue with this code is that all sub-generators are exactly identical 
+            #  because the difference between patches in the PQWGAN come from the weights, 
+            #  which differ for each sub-generator, while in my case they are all the same generator
+            for patch in range(self.n_patches):
+                current_patch = self.from_probs_to_pixels(latent_vector[batch_image_index])
+                current_patch = current_patch[:self.pixels_per_patch]
+                # TODO: THIS ASSUMES A PATCH IS A ROW, as it does not take shape into account!!!
+                current_patch = torch.reshape(torch.from_numpy(current_patch), (1, self.pixels_per_patch))
+                patches = torch.cat((current_patch, patches))
+            images_batch[batch_image_index] = patches
+
+        return images_batch

@@ -1,4 +1,5 @@
 import os
+import math
 from datetime import datetime
 
 # Utils parameters
@@ -10,7 +11,6 @@ OUTPUT_DIR = os.path.join(f"./output/{ARCHITECTURE_NAME}/{STRING_TIME}")
 #####################
 ## GAN PARAMETERS ##
 #####################
-N_EPOCHS = 2
 BATCH_SIZE = 32
 LR_G = 0.01  # learning rate for the generator
 # Betas, initial decay rate for the Adam optimizer
@@ -23,14 +23,19 @@ LAMBDA_GP = 10  # Coefficient for the gradient penalty
 ## IMAGE VARIABLES ##
 #####################
 
-IMAGE_SIZE = 28
+IMAGE_SIDE = 28
 CLASSES = [0, 1]  # This only works for MNIST, picks number classes as specified in list
-
+# Note: for development phase, I assume square images
+N_PIXELS = IMAGE_SIDE ** 2
 
 #######################
 ## CIRCUIT VARIABLES ##
 #######################
-N_PATCHES = 28
-# TODO: insert a control that n_qubits * n_patches = num of pixels
-N_QUBITS = int((IMAGE_SIZE*IMAGE_SIZE) / N_PATCHES)
+# Note: assuming patches are rows
+N_PATCHES = IMAGE_SIDE
+PIXELS_PER_PATCH = int(N_PIXELS / N_PATCHES)  # TODO insert a control that this is an integer
+N_ANCILLAS = 1
+# Data qubit determined by the number of qubits required to generate as many pixels as needed per
+# one patch
+N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2))
 
