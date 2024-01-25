@@ -7,12 +7,12 @@ from qiskit.circuit import Parameter
 
 
 def get_probabilities(quantum_circuit, n_tot_qubits, sim):
-    """ Executes the givn circuit on the given simulator, calculates and outputs the
+    """ Executes the given circuit on the given simulator, calculates and outputs the
     probabilities of each computational quantum state for the circuit.
     The probabilities are calculated as the square of the absolute value of each amplitude
     in the statevector obtained from the simulation result.
 
-    :param quantum_circuit: ??? . The quantum circuit to be executed.
+    :param quantum_circuit: qiskit.circuit.quantumcircuit.QuantumCircuit. The quantum circuit to be executed.
     :param n_tot_qubits: int. The total number of qubits in the quantum circuit (data + ancilla).
     :param sim: str. Name of the simulator backend to be used for execution, e.g., 'aer_simulator'.
 
@@ -46,7 +46,7 @@ def from_probs_to_pixels(quantum_circuit, n_tot_qubits, n_ancillas, sim):
     3. Ensures the sum of probabilities equals 1.
     4. Normalizes the final pixel values between -1 and 1.
 
-    :param quantum_circuit: ???. The quantum circuit to be executed.
+    :param quantum_circuit: qiskit.circuit.quantumcircuit.QuantumCircuit. The quantum circuit to be executed.
     :param n_tot_qubits: int. Total number of qubits in the circuit.
     :param n_ancillas: int. Number of ancilla qubits in the circuit.
     :param sim: str. Name of the simulator backend to be used for execution, e.g., 'aer_simulator'.
@@ -73,7 +73,7 @@ def from_patches_to_image(quantum_circuit, n_tot_qubits, n_ancillas, n_patches, 
     Note: In the current implementation the function ASSUMES that each patch is a row in the final
     image.
 
-    :param quantum_circuit: ???. The quantum circuit to be executed.
+    :param quantum_circuit: qiskit.circuit.quantumcircuit.QuantumCircuit. The quantum circuit to be executed.
     :param n_tot_qubits: int. Total number of qubits in the circuit.
     :param n_ancillas: int. Number of ancilla qubits in the circuit.
     :param n_patches: int. Number of patches to generate for the image.
