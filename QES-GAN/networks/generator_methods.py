@@ -25,7 +25,6 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim):
     #     sim.set_options(device='GPU')
     #     print('gpu used')
 
-    sim = Aer.get_backend(sim + '_simulator')  # TODO: not the right place to put it
     job = execute(quantum_circuit, sim)  # Execute the circuit `qc` on the simulator `sim`
     result = job.result()  # Retrieves the result of the execution
     statevector = result.get_statevector(quantum_circuit)
