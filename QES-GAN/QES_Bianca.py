@@ -17,12 +17,6 @@ from generator_fitness_function import scoring_function
 # np.random.seed(123)  # for replicability
 
 
-# TODO: improve documentation
-# Found issue: the latent vector is never given to the new circuits. This needs to be changes.
-# So, right now I define a circuit with an initial latent vector and change the gates (inlcuding
-# the encoding gates) but instead I should keep the encoding gates, change the latent vector,
-# and change the other gates with the evolutionary algorithm.
-
 class Qes:
     """
     Hybrid quantum-classical optimization technique
@@ -251,21 +245,31 @@ class Qes:
                         element_to_remove[1] = qubits_
                         element_to_add = tuple(element_to_remove)
                         qc.data[position] = element_to_add
+                        print('Circuit after swap action')
+                        print(qc)
 
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
                     print("MUTATE action was selected \n")
                     to_not_select = 'h'  # because h is not a rotation gate, so cannot be MUTATED
-                    check = True
+                    check = False
                     gate_to_mutate = None
+                    found_gate = False
 
-                    # if the only gates left are encoding, there is nothing to mutate this round
-                    if len(qc.data) == self.n_tot_qubits:
-                        check = False
-                        print("Skipping mutate action because there are no gates available to "
-                              "mutate")
+                    # # if the only gates left are encoding, there is nothing to mutate this round
+                    # if len(qc.data) == self.n_tot_qubits:
+                    #     check = False
+                    #     print("Skipping mutate action because there are no gates available to "
+                    #           "mutate")
 
-                    # TODO: not gonna work if there are only hadamard gates
+                    for gate in qc.data[self.n_tot_qubits:]:
+                        if gate[0].name != to_not_select:
+                            check = True
+                        else:
+                            check = False
+                            print('Skipping mutate action as there are no gates available for '
+                                  'mutation')
+
                     while check:
                         # pick a number between n_tot_qubits and n_tot_gates to select the gate
                         # to mutate while avoiding the first n_tot_qubits gates (encoding)
@@ -275,13 +279,18 @@ class Qes:
 
                         if gate_to_mutate[0].name != to_not_select:
                             check = False
-                    angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
-                    element_to_mute = list(gate_to_mutate)
-                    element_to_mute[0] = gate_dict[gate_to_mutate[0].name](angle_new)
-                    element_to_add = tuple(element_to_mute)
-                    qc.data[position] = element_to_add
-                    print(f'Muted gate {element_to_mute} into {element_to_mute} at '
-                          f'position {position}')
+                            found_gate = True
+
+                    if found_gate:
+                        angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
+                        element_to_mute = list(gate_to_mutate)
+                        element_to_mute[0] = gate_dict[gate_to_mutate[0].name](angle_new)
+                        element_to_add = tuple(element_to_mute)
+                        qc.data[position] = element_to_add
+                        print(f'Muted gate {element_to_mute} into {element_to_add} at '
+                              f'position {position}')
+                    else:
+                        pass
 
                 # In case of multiactions we are appending more circuits to the population,
                 # if you don't want that put the next code line outside of the for loop on counter
@@ -380,8 +389,7 @@ class Qes:
             print(self.candidate_sol[0])
             self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
                                                      critic=self.critic_net,
-                                                     # qc=self.ind,
-                                                     qc=self.population[0],  # TODO: why
+                                                     qc=self.population[0],
                                                      n_tot_qubits=self.n_tot_qubits,
                                                      n_ancillas=self.n_ancilla,
                                                      n_patches=self.n_patches,
@@ -396,7 +404,7 @@ class Qes:
             self.fitnesses.append(scoring_function(batch_size=self.batch_size,
                                                    critic=self.critic_net,
                                                    # qc=self.ind,
-                                                   qc=self.population[i],  # TODO: correct?
+                                                   qc=self.population[i],
                                                    n_tot_qubits=self.n_tot_qubits,
                                                    n_ancillas=self.n_ancilla,
                                                    n_patches=self.n_patches,
@@ -483,11 +491,11 @@ class Qes:
                 print('circuit depth:', self.depth[g])
                 print('best solution so far:\n_qubits', self.best_solution[g])
 
-                # Add some controls to reduce probabilities to get stuck in local minima: change hyperparameter value
+                # To reduce probability to get stuck in local minima: change hyper-parameter value
                 if self.no_improvements == self.max_gen_no_improvement:
                     print('Dtheta increased to avoid local minima')
                     self.dtheta += 0.1
-                    # In principle, we might also increase the multi-action probability: self.multi_action_pb
+                    # Another way would be to increase self.multi_action_pb
                 elif self.no_improvements == 0:
                     self.dtheta = theta_default
                 print('dtheta:', self.dtheta)
