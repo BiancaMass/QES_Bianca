@@ -251,46 +251,59 @@ class Qes:
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
                     print("MUTATE action was selected \n")
-                    to_not_select = 'h'  # because h is not a rotation gate, so cannot be MUTATED
-                    check = False
-                    gate_to_mutate = None
-                    found_gate = False
+                    to_not_select = 'h'
+                    gates_to_mutate = [i for i, gate in enumerate(qc.data[self.n_tot_qubits:],
+                                                                  start=self.n_tot_qubits)
+                                       if gate[0].name != to_not_select]
 
-                    # # if the only gates left are encoding, there is nothing to mutate this round
-                    # if len(qc.data) == self.n_tot_qubits:
-                    #     check = False
-                    #     print("Skipping mutate action because there are no gates available to "
-                    #           "mutate")
-
-                    for gate in qc.data[self.n_tot_qubits:]:
-                        if gate[0].name != to_not_select:
-                            check = True
-                        else:
-                            check = False
-                            print('Skipping mutate action as there are no gates available for '
-                                  'mutation')
-
-                    while check:
-                        # pick a number between n_tot_qubits and n_tot_gates to select the gate
-                        # to mutate while avoiding the first n_tot_qubits gates (encoding)
-                        position = random.choice([i for i in range(self.n_tot_qubits,
-                                                                   len(qc.data))])
+                    if gates_to_mutate:
+                        position = random.choice(gates_to_mutate)
                         gate_to_mutate = qc.data[position]
 
-                        if gate_to_mutate[0].name != to_not_select:
-                            check = False
-                            found_gate = True
+                        angle_new = gate_to_mutate[0].params[0] + random.uniform(0, self.dtheta)
+                        mutated_gate = gate_dict[gate_to_mutate[0].name](angle_new)
+                        qc.data[position] = (mutated_gate, *gate_to_mutate[1:])
 
-                    if found_gate:
-                        angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
-                        element_to_mute = list(gate_to_mutate)
-                        element_to_mute[0] = gate_dict[gate_to_mutate[0].name](angle_new)
-                        element_to_add = tuple(element_to_mute)
-                        qc.data[position] = element_to_add
-                        print(f'Muted gate {element_to_mute} into {element_to_add} at '
-                              f'position {position}')
+                        print(
+                            f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')
                     else:
-                        pass
+                        print('Skipping mutate action as there are no gates available for mutation')
+
+                # elif self.act_choice[j] == 'M':
+                #     print("MUTATE action was selected \n")
+                #     to_not_select = 'h'  # because h is not a rotation gate, so cannot be MUTATED
+                #     check = False
+                #     found_gate = False
+                #     gate_to_mutate = None
+                #
+                #     for gate in qc.data[self.n_tot_qubits:]:
+                #         if gate[0].name != to_not_select:
+                #             check = True
+                #         else:
+                #             check = False
+                #
+                #     while check:
+                #         # pick a number between n_tot_qubits and n_tot_gates to select the gate
+                #         # to mutate while avoiding the first n_tot_qubits gates (encoding)
+                #         position = random.choice([i for i in range(self.n_tot_qubits,
+                #                                                    len(qc.data))])
+                #         gate_to_mutate = qc.data[position]
+                #
+                #         if gate_to_mutate[0].name != to_not_select:
+                #             check = False
+                #             found_gate = True
+                #
+                #     if found_gate:
+                #         angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
+                #         element_to_mute = list(gate_to_mutate)
+                #         element_to_mute[0] = gate_dict[gate_to_mutate[0].name](angle_new)
+                #         element_to_add = tuple(element_to_mute)
+                #         qc.data[position] = element_to_add
+                #         print(f'Muted gate {element_to_mute} into {element_to_add} at '
+                #               f'position {position}')
+                #     else:
+                #         print('Skipping mutate action as there are no gates available for '
+                #               'mutation')
 
                 # In case of multiactions we are appending more circuits to the population,
                 # if you don't want that put the next code line outside of the for loop on counter
