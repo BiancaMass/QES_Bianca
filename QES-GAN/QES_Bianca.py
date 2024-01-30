@@ -269,30 +269,6 @@ class Qes:
                     else:
                         print('Skipping mutate action as there are no gates available for mutation')
 
-                # elif self.act_choice[j] == 'M':
-                #     print("MUTATE action was selected \n")
-                #     to_not_select = 'h'  # because h is not a rotation gate, so cannot be MUTATED
-                #     check = False
-                #     found_gate = False
-                #     gate_to_mutate = None
-                #
-                #     for gate in qc.data[self.n_tot_qubits:]:
-                #         if gate[0].name != to_not_select:
-                #             check = True
-                #         else:
-                #             check = False
-                #
-                #     while check:
-                #         # pick a number between n_tot_qubits and n_tot_gates to select the gate
-                #         # to mutate while avoiding the first n_tot_qubits gates (encoding)
-                #         position = random.choice([i for i in range(self.n_tot_qubits,
-                #                                                    len(qc.data))])
-                #         gate_to_mutate = qc.data[position]
-                #
-                #         if gate_to_mutate[0].name != to_not_select:
-                #             check = False
-                #             found_gate = True
-                #
                 #     if found_gate:
                 #         angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
                 #         element_to_mute = list(gate_to_mutate)
@@ -301,9 +277,6 @@ class Qes:
                 #         qc.data[position] = element_to_add
                 #         print(f'Muted gate {element_to_mute} into {element_to_add} at '
                 #               f'position {position}')
-                #     else:
-                #         print('Skipping mutate action as there are no gates available for '
-                #               'mutation')
 
                 # In case of multiactions we are appending more circuits to the population,
                 # if you don't want that put the next code line outside of the for loop on counter
@@ -467,7 +440,7 @@ class Qes:
         :returns: Self, with updated evolutionary process attributes.
         :rtype: instance
         """
-        self.best_actions = []  # Check: why is this stored
+        self.best_actions = []  # to save in the output file
         action_weights = self.action_weights
         theta_default = self.dtheta
         for g in range(self.n_generations):
