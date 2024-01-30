@@ -5,9 +5,10 @@ Vincenzo's code, edited by Bianca.
 import numpy as np
 import random
 import math
+import torch
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
 from qiskit.circuit.library import RYGate, RXGate, RZGate, RXXGate, RYYGate, RZZGate
-from qiskit_aer import AerSimulator, AerError
+from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
@@ -138,6 +139,15 @@ class Qes:
         self.output = None
 
         print('Initial quantum circuit: \n', self.ind)
+
+        # TODO: test on DSDI infrastructure
+        # if gpu option was set, and gpu available, use gpu for the simulation
+        if self.gpu:
+            if torch.cuda.is_available():
+                print('GPU used.')
+            else:
+                print("Warning: GPU not available. Reverting to CPU.")
+                self.gpu = False
 
     def action(self):
         """ It generates n_children of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
@@ -298,14 +308,9 @@ class Qes:
 
         # TODO: test on DSDI infrastructure
         # if gpu option was set, and gpu available, use gpu for the simulation
-        try:
-            if self.gpu:
-                sim.set_options(device='GPU')
-                print('GPU used.')
-        except AerError as e:
-            print(e)
-            print("Warning: GPU not available. Reverting to CPU.")
-            sim.set_options(device='CPU')  # Revert to CPU
+        if self.gpu:
+            sim.set_options(device='GPU')
+            print('GPU used.')
 
         self.candidate_sol = []
         # Let qasm be more free because of the shot noise
@@ -339,7 +344,8 @@ class Qes:
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
                                                         pixels_per_patch=self.pixels_per_patch,
-                                                        sim=sim)
+                                                        sim=sim,
+                                                        gpu=self.gpu)
 
             if self.current_gen == 0:
                 self.best_solution.append(resulting_image)
@@ -390,13 +396,13 @@ class Qes:
         for i in range(len(self.candidate_sol)):  # should this be population instead?
             self.fitnesses.append(scoring_function(batch_size=self.batch_size,
                                                    critic=self.critic_net,
-                                                   # qc=self.ind,
                                                    qc=self.population[i],
                                                    n_tot_qubits=self.n_tot_qubits,
                                                    n_ancillas=self.n_ancilla,
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
-                                                   sim=sim))
+                                                   sim=sim,
+                                                   gpu=self.gpu))
             print(f'fitnesses: {self.fitnesses}')
             self.fitness_evaluations += 1
 
