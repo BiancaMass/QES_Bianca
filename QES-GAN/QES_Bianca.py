@@ -372,7 +372,7 @@ class Qes:
             sim = Aer.get_backend(self.simulator + '_simulator')
 
         # if there are more candidates than chosen number of children
-        # TODO: why?
+        # Question: why?
         if len(self.candidate_sol) > self.n_children:
             self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
                                                      critic=self.critic_net,
