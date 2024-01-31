@@ -5,23 +5,18 @@ Vincenzo's code, edited by Bianca.
 import numpy as np
 import random
 import math
+import torch
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
 from qiskit.circuit.library import RYGate, RXGate, RZGate, RXXGate, RYYGate, RZZGate
 from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
-from networks.generator_methods import get_probabilities, from_probs_to_pixels, from_patches_to_image
+from networks.generator_methods import from_patches_to_image
 from generator_fitness_function import scoring_function
 
 # np.random.seed(123)  # for replicability
 
-
-# TODO: improve documentation
-# Found issue: the latent vector is never given to the new circuits. This needs to be changes.
-# So, right now I define a circuit with an initial latent vector and change the gates (inlcuding
-# the encoding gates) but instead I should keep the encoding gates, change the latent vector,
-# and change the other gates with the evolutionary algorithm.
 
 class Qes:
     """
@@ -48,9 +43,8 @@ class Qes:
         :param shots: integer. Number of executions on the circuit to get the prob. distribution.
         :param simulator: string. Qiskit simulator. Either 'statevector' or 'qasm'.
         :param noise: Boolean. True if a noisy simulation is required, False otherwise.
-        :param gpu: Boolean. If True, it simulates quantum circuits on GPUs if available.
-        # TODO: add code that checks if GPU is available and if not prints a warning if True was
-            selected.
+        :param gpu: Boolean. If True, it checks that GPU is available, and, if so, it simulates
+        quantum circuits on GPU.
         :param dtheta: float. Maximum displacement for the angle parameter in the mutation action.
         :param action_weights: list. Probability to choose between the 4 possible actions. Their
         sum must be 100.
@@ -146,6 +140,15 @@ class Qes:
 
         print('Initial quantum circuit: \n', self.ind)
 
+        # TODO: test on DSDI infrastructure
+        # if gpu option was set, and gpu available, use gpu for the simulation
+        if self.gpu:
+            if torch.cuda.is_available():
+                print('GPU used.')
+            else:
+                print("Warning: GPU not available. Reverting to CPU.")
+                self.gpu = False
+
     def action(self):
         """ It generates n_children of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
         delete, swap, mutate) on each of them. Then the new quantum circuits are stored in the
@@ -206,82 +209,80 @@ class Qes:
                     print("Circuit after DELETE action")
                     print(qc)
 
-                # SWAP: Remove a gate in a random position and replace it with a new gate randomly
-                # chosen
+                # SWAP: Remove a random gate and replace it with a new gate randomly chosen
                 elif self.act_choice[j] == 'S':
                     print("SWAP action was selected \n")
                     if len(qc.data) - 1 - self.n_tot_qubits > 0:
                         # Pick a position for the gate to swap
-                        # An int b/w n_tot_qubits and (n_tot_gates-2)
                         # Exclude the the first n_tot_qubits gates (encoding gates)
                         position = random.randint(self.n_tot_qubits, len(qc.data) - 2)
-                    # CHECK: where is position defined if not in the if statement?
-                    gate_to_remove = qc.data[position][0]
-                    gate_to_add = random.choice(list(gate_dict.values()))(angle)
-                    # Avoid removing and adding the same gate
-                    while gate_to_add.name == gate_to_remove.name:
-                        gate_to_add = random.choice(list(gate_dict.values()))(angle)
-                    if gate_to_add.name == 'rzz' or gate_to_add.name == 'rxx' or gate_to_add.name == 'ryy':
-                        n_qubits = 2
+                        remove_ok = True
                     else:
-                        n_qubits = 1
-                    # number of qubits affected by the gate to be swapped
-                    length = len(qc.data[position][1])
-                    # if we are swapping gates with the same amount of qubits
-                    if length == n_qubits:
-                        element_to_remove = list(qc.data[position])
-                        element_to_remove[0] = gate_to_add  # swap the gates
-                        element_to_add = tuple(element_to_remove)
-                        qc.data[position] = element_to_add
-                    elif length > n_qubits:
-                        element_to_remove = list(qc.data[position])
-                        element_to_remove[0] = gate_to_add
-                        element_to_remove[1] = [random.choice(qc.data[position][1])]
-                        element_to_add = tuple(element_to_remove)
-                        qc.data[position] = element_to_add
-                    elif length < n_qubits:
-                        element_to_remove = list(qc.data[position])
-                        element_to_remove[0] = gate_to_add
-                        qubits_available = []
-                        for q in qc.qubits:
-                            if [q] != qc.data[position][1]:
-                                qubits_available.append(q)
-                        qubits_ = [qc.data[position][1], random.choice(qubits_available)]
-                        random.shuffle(qubits_)
-                        element_to_remove[1] = qubits_
-                        element_to_add = tuple(element_to_remove)
-                        qc.data[position] = element_to_add
+                        # Handle the case where there are not enough gates to swap
+                        print("Not enough gates to perform SWAP action.")
+                        remove_ok = False
+
+                    if remove_ok:
+                        gate_to_remove = qc.data[position][0]
+                        gate_to_add = random.choice(list(gate_dict.values()))(angle)
+                        # Avoid removing and adding the same gate
+                        while gate_to_add.name == gate_to_remove.name:
+                            gate_to_add = random.choice(list(gate_dict.values()))(angle)
+                        if gate_to_add.name == 'rzz' or gate_to_add.name == 'rxx' or gate_to_add.name == 'ryy':
+                            n_qubits = 2
+                        else:
+                            n_qubits = 1
+                        # number of qubits affected by the gate to be swapped
+                        length = len(qc.data[position][1])
+                        # if we are swapping gates with the same amount of qubits
+                        if length == n_qubits:
+                            element_to_remove = list(qc.data[position])
+                            element_to_remove[0] = gate_to_add  # swap the gates
+                            element_to_add = tuple(element_to_remove)
+                            qc.data[position] = element_to_add
+                        elif length > n_qubits:
+                            element_to_remove = list(qc.data[position])
+                            element_to_remove[0] = gate_to_add
+                            element_to_remove[1] = [random.choice(qc.data[position][1])]
+                            element_to_add = tuple(element_to_remove)
+                            qc.data[position] = element_to_add
+                        elif length < n_qubits:
+                            element_to_remove = list(qc.data[position])
+                            element_to_remove[0] = gate_to_add
+                            qubits_available = []
+                            for q in qc.qubits:
+                                if [q] != qc.data[position][1]:
+                                    qubits_available.append(q)
+                            qubits_ = [qc.data[position][1], random.choice(qubits_available)]
+                            random.shuffle(qubits_)
+                            element_to_remove[1] = qubits_
+                            element_to_add = tuple(element_to_remove)
+                            qc.data[position] = element_to_add
+                            print('Circuit after SWAP action')
+                            print(qc)
 
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
                     print("MUTATE action was selected \n")
-                    to_not_select = 'h'  # because h is not a rotation gate, so cannot be MUTATED
-                    check = True
-                    gate_to_mutate = None
+                    to_not_select = 'h'
+                    gates_to_mutate = [i for i, gate in enumerate(qc.data[self.n_tot_qubits:],
+                                                                  start=self.n_tot_qubits)
+                                       if gate[0].name != to_not_select]
 
-                    # if the only gates left are encoding, there is nothing to mutate this round
-                    if len(qc.data) == self.n_tot_qubits:
-                        check = False
-                        print("Skipping mutate action because there are no gates available to "
-                              "mutate")
-
-                    # TODO: not gonna work if there are only hadamard gates
-                    while check:
-                        # pick a number between n_tot_qubits and n_tot_gates to select the gate
-                        # to mutate while avoiding the first n_tot_qubits gates (encoding)
-                        position = random.choice([i for i in range(self.n_tot_qubits,
-                                                                   len(qc.data))])
+                    if gates_to_mutate:
+                        position = random.choice(gates_to_mutate)
                         gate_to_mutate = qc.data[position]
 
-                        if gate_to_mutate[0].name != to_not_select:
-                            check = False
-                    angle_new = qc.data[position][0].params[0] + random.uniform(0, self.dtheta)
-                    element_to_mute = list(gate_to_mutate)
-                    element_to_mute[0] = gate_dict[gate_to_mutate[0].name](angle_new)
-                    element_to_add = tuple(element_to_mute)
-                    qc.data[position] = element_to_add
-                    print(f'Muted gate {element_to_mute} into {element_to_mute} at '
-                          f'position {position}')
+                        angle_new = gate_to_mutate[0].params[0] + random.uniform(0, self.dtheta)
+                        mutated_gate = gate_dict[gate_to_mutate[0].name](angle_new)
+                        qc.data[position] = (mutated_gate, *gate_to_mutate[1:])
+
+                        print(
+                            f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')
+                        print('Circuit after MUTATE action')
+                        print(qc)
+                    else:
+                        print('Skipping MUTATE action as there are no gates available for mutation')
 
                 # In case of multiactions we are appending more circuits to the population,
                 # if you don't want that put the next code line outside of the for loop on counter
@@ -304,11 +305,12 @@ class Qes:
             sim = AerSimulator.from_backend(backend)
         else:
             sim = Aer.get_backend(self.simulator + '_simulator')
-        # TODO: add condition that if GPU was set but is not available, it goes back
-        #  to CPU and prints a warning that it did that
+
+        # TODO: test on DSDI infrastructure
+        # if gpu option was set, and gpu available, use gpu for the simulation
         if self.gpu:
-            sim.set_options(device='GPU')  # Check this works with DSDI infrastructure
-            print('gpu used')
+            sim.set_options(device='GPU')
+            print('GPU used.')
 
         self.candidate_sol = []
         # Let qasm be more free because of the shot noise
@@ -342,7 +344,8 @@ class Qes:
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
                                                         pixels_per_patch=self.pixels_per_patch,
-                                                        sim=sim)
+                                                        sim=sim,
+                                                        gpu=self.gpu)
 
             if self.current_gen == 0:
                 self.best_solution.append(resulting_image)
@@ -375,13 +378,11 @@ class Qes:
             sim = Aer.get_backend(self.simulator + '_simulator')
 
         # if there are more candidates than chosen number of children
-        # TODO: why?
+        # Question: why?
         if len(self.candidate_sol) > self.n_children:
-            print(self.candidate_sol[0])
             self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
                                                      critic=self.critic_net,
-                                                     # qc=self.ind,
-                                                     qc=self.population[0],  # TODO: why
+                                                     qc=self.population[0],
                                                      n_tot_qubits=self.n_tot_qubits,
                                                      n_ancillas=self.n_ancilla,
                                                      n_patches=self.n_patches,
@@ -395,14 +396,14 @@ class Qes:
         for i in range(len(self.candidate_sol)):  # should this be population instead?
             self.fitnesses.append(scoring_function(batch_size=self.batch_size,
                                                    critic=self.critic_net,
-                                                   # qc=self.ind,
-                                                   qc=self.population[i],  # TODO: correct?
+                                                   qc=self.population[i],
                                                    n_tot_qubits=self.n_tot_qubits,
                                                    n_ancillas=self.n_ancilla,
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
-                                                   sim=sim))
-            print(self.fitnesses)
+                                                   sim=sim,
+                                                   gpu=self.gpu))
+            print(f'fitnesses: {self.fitnesses}')
             self.fitness_evaluations += 1
 
         if self.current_gen == 0:
@@ -446,7 +447,7 @@ class Qes:
         :returns: Self, with updated evolutionary process attributes.
         :rtype: instance
         """
-        self.best_actions = []  # Check: why is this stored
+        self.best_actions = []  # to save in the output file
         action_weights = self.action_weights
         theta_default = self.dtheta
         for g in range(self.n_generations):
@@ -481,13 +482,13 @@ class Qes:
                     self.best_solution.append(self.best_solution[g - 1])
                 print('best qc:\n_qubits', self.ind)
                 print('circuit depth:', self.depth[g])
-                print('best solution so far:\n_qubits', self.best_solution[g])
+                # print('best solution so far:\n_qubits', self.best_solution[g])
 
-                # Add some controls to reduce probabilities to get stuck in local minima: change hyperparameter value
+                # To reduce probability to get stuck in local minima: change hyper-parameter value
                 if self.no_improvements == self.max_gen_no_improvement:
                     print('Dtheta increased to avoid local minima')
                     self.dtheta += 0.1
-                    # In principle, we might also increase the multi-action probability: self.multi_action_pb
+                    # Another way would be to increase self.multi_action_pb
                 elif self.no_improvements == 0:
                     self.dtheta = theta_default
                 print('dtheta:', self.dtheta)

@@ -28,7 +28,7 @@ from networks.generator_methods import from_patches_to_image
 
 def scoring_function(batch_size, critic, qc,
                      n_tot_qubits, n_ancillas, n_patches,
-                     pixels_per_patch, sim):
+                     pixels_per_patch, sim, gpu):
     """
     Calculates a score for a given quantum circuit based on a pre-trained critic network.
     The function generates a batch of images using the specified quantum circuit and latent vectors.
@@ -37,15 +37,14 @@ def scoring_function(batch_size, critic, qc,
     The function returns the average score for the whole the batch, providing an overall
     evaluation of the quantum circuit.
 
-    # TODO: determine data type of some of these params
-    :param batch_size: int.
-    :param critic: nn.Module.
-    :param qc: ???
-    :param n_tot_qubits: int.
-    :param n_ancillas: int.
-    :param n_patches: int.
-    :param pixels_per_patch: int.
-    :param sim: ???. (string?)
+    :param batch_size: int. The number of images to generate and evaluate in one batch.
+    :param critic: torch.nn.Module. The pre-trained critic network used for evaluating the images.
+    :param qc: qiskit.circuit.quantumcircuit.QuantumCircuit. The quantum circuit to be executed.
+    :param n_tot_qubits: int. The total number of qubits used in the quantum circuit.
+    :param n_ancillas: int. The number of ancillary qubits in the quantum circuit.
+    :param n_patches: int. The number of patches into which each image is divided.
+    :param pixels_per_patch: int. The number of pixels in each patch of an image.
+    :param sim: StatevectorSimulator. The simulator used to run the quantum circuit.
 
     :return: float. The average score for the generated batch of images, as evaluated by the critic.
     """
@@ -57,7 +56,8 @@ def scoring_function(batch_size, critic, qc,
                                                 n_ancillas=n_ancillas,
                                                 n_patches=n_patches,
                                                 pixels_per_patch=pixels_per_patch,
-                                                sim=sim)
+                                                sim=sim,
+                                                gpu=gpu)
         generated_images.append(generated_image)
 
     # Evaluate the generated images using the pre-trained critic network
