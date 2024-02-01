@@ -362,14 +362,6 @@ class Qes:
         # print(len(self.candidate_sol))
         # print(self.n_children)
 
-        #if self.simulator == 'statevector':
-        #    self.noise = False
-        #if self.noise:
-        #    backend = FakeMumbaiV2()
-        #    sim = AerSimulator.from_backend(backend)
-        #else:
-        #    sim = Aer.get_backend(self.simulator + '_simulator')
-
         # if there are more candidates than chosen number of children
         # Question: why?
         if len(self.candidate_sol) > self.n_children:

@@ -70,6 +70,6 @@ def scoring_function(batch_size, critic, qc,
     fake_validity = critic(generated_images_tensor)
 
     # Calculate the average score for this batch as the organism's score
-    average_score = float(torch.mean(fake_validity.detach()))  # TODO: check that this gives a good score for real images
+    average_score = float(torch.mean(fake_validity.detach()))
 
     return average_score
