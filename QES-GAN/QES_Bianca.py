@@ -337,8 +337,7 @@ class Qes:
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
                                                         pixels_per_patch=self.pixels_per_patch,
-                                                        sim=self.sim,
-                                                        gpu=self.gpu)
+                                                        sim=self.sim)
 
             if self.current_gen == 0:
                 self.best_solution.append(resulting_image)
@@ -372,7 +371,6 @@ class Qes:
                                                      n_ancillas=self.n_ancilla,
                                                      n_patches=self.n_patches,
                                                      pixels_per_patch=self.pixels_per_patch,
-                                                     gpu=self.gpu,
                                                      device=self.device,
                                                      sim=self.sim)
 
@@ -389,7 +387,6 @@ class Qes:
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
                                                    sim=self.sim,
-                                                   gpu=self.gpu,
                                                    device=self.device))
             print(f'fitnesses: {self.fitnesses}')
             self.fitness_evaluations += 1

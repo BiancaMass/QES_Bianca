@@ -28,7 +28,7 @@ from networks.generator_methods import from_patches_to_image
 
 def scoring_function(batch_size, critic, qc,
                      n_tot_qubits, n_ancillas, n_patches,
-                     pixels_per_patch, sim, gpu, device):
+                     pixels_per_patch, sim, device):
     """
     Calculates a score for a given quantum circuit based on a pre-trained critic network.
     The function generates a batch of images using the specified quantum circuit and latent vectors.
@@ -56,13 +56,12 @@ def scoring_function(batch_size, critic, qc,
                                                 n_ancillas=n_ancillas,
                                                 n_patches=n_patches,
                                                 pixels_per_patch=pixels_per_patch,
-                                                sim=sim,
-                                                gpu=gpu)
+                                                sim=sim)
         generated_images.append(generated_image)
 
     # Evaluate the generated images using the pre-trained critic network
     print(f'Device used in generator_fitness_function: {device}')
-    critic.to(device) # TODO: might be redundant
+    # critic.to(device) # redundant
 
     generated_images_tensor = torch.stack(generated_images)
     generated_images_tensor = generated_images_tensor.to(device)

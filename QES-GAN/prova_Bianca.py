@@ -33,7 +33,7 @@ print(f'Using device: {device}')
 critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
 critic_net = critic_net.to(device)
 current_working_directory = os.getcwd()
-critic_net_path = current_working_directory + '/output/' + "critic-510.pt"
+critic_net_path = current_working_directory + '/QES-GAN/output/' + "critic-510.pt"
 print(f'critic net path: {critic_net_path}')
 # Import pre-trained critic net
 critic_net.load_state_dict(torch.load(critic_net_path))
