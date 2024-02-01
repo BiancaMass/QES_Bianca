@@ -19,14 +19,6 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim, gpu):
 
     p = np.zeros(2 ** n_tot_qubits)  # to store the probabilities
 
-    if gpu:
-        if torch.cuda.is_available():
-            sim.set_options(device='GPU')
-            print('GPU used.')
-        else:
-            print("Warning: GPU not available. Reverting to CPU.")
-            sim.set_options(device='CPU')  # Revert to CPU
-
     job = execute(quantum_circuit, sim)  # Execute the circuit `qc` on the simulator `sim`
     result = job.result()  # Retrieves the result of the execution
     statevector = result.get_statevector(quantum_circuit)

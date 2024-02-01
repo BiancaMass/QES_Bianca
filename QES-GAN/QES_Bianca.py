@@ -26,7 +26,7 @@ class Qes:
     def __init__(self, n_data_qubits, n_ancilla, image_shape,
                  batch_size, critic_net,
                  n_children, n_max_evaluations,
-                 shots, simulator, noise, gpu,
+                 shots, simulator, noise, gpu, device,
                  dtheta, action_weights, multi_action_pb,
                  max_gen_no_improvement,
                  **kwargs):
@@ -45,6 +45,7 @@ class Qes:
         :param noise: Boolean. True if a noisy simulation is required, False otherwise.
         :param gpu: Boolean. If True, it checks that GPU is available, and, if so, it simulates
         quantum circuits on GPU.
+        :param device: string. The device (CPU or GPU) on which to perform operations.
         :param dtheta: float. Maximum displacement for the angle parameter in the mutation action.
         :param action_weights: list. Probability to choose between the 4 possible actions. Their
         sum must be 100.
@@ -52,7 +53,7 @@ class Qes:
         :param max_gen_no_improvement: integer. Number of generations with no improvements after which some changes will be applied
         :keyword max_depth: integer. It fixes an upper bound on the quantum circuits depth.
         """
-
+        print("Initializing Qes instance")
         self.n_data_qubits = n_data_qubits
         self.n_ancilla = n_ancilla
         self.n_tot_qubits = n_data_qubits + n_ancilla
@@ -69,11 +70,25 @@ class Qes:
         self.shots = shots
         self.simulator = simulator
         self.gpu = gpu
+        self.device = device
         self.noise = noise
         self.dtheta = dtheta
         self.action_weights = action_weights
         self.multi_action_pb = multi_action_pb
         self.max_gen_no_improvement = max_gen_no_improvement + 1
+
+        if self.simulator == 'statevector':
+            self.noise = False
+        if self.noise:
+            backend = FakeMumbaiV2()
+            self.sim = AerSimulator.from_backend(backend)
+        else:
+            self.sim = Aer.get_backend(self.simulator + '_simulator')
+
+        # Setup Gpu
+        if self.gpu:
+            self.sim.set_options(device='GPU')
+            print('gpu used')
 
         # Number of generations for the evolution algorithm
         self.n_generations = math.ceil(n_max_evaluations / n_children)
@@ -140,15 +155,7 @@ class Qes:
 
         print('Initial quantum circuit: \n', self.ind)
 
-        # TODO: test on DSDI infrastructure
-        # if gpu option was set, and gpu available, use gpu for the simulation
-        if self.gpu:
-            if torch.cuda.is_available():
-                print('GPU used.')
-            else:
-                print("Warning: GPU not available. Reverting to CPU.")
-                self.gpu = False
-
+        
     def action(self):
         """ It generates n_children of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
         delete, swap, mutate) on each of them. Then the new quantum circuits are stored in the
@@ -297,21 +304,7 @@ class Qes:
         """
 
         latent_vector = np.random.rand(self.n_tot_qubits)  # TODO: this is not used!!
-
-        if self.simulator == 'statevector':
-            self.noise = False
-        if self.noise:
-            backend = FakeMumbaiV2()
-            sim = AerSimulator.from_backend(backend)
-        else:
-            sim = Aer.get_backend(self.simulator + '_simulator')
-
-        # TODO: test on DSDI infrastructure
-        # if gpu option was set, and gpu available, use gpu for the simulation
-        if self.gpu:
-            sim.set_options(device='GPU')
-            print('GPU used.')
-
+        
         self.candidate_sol = []
         # Let qasm be more free because of the shot noise
         if self.simulator == 'qasm':
@@ -344,7 +337,7 @@ class Qes:
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
                                                         pixels_per_patch=self.pixels_per_patch,
-                                                        sim=sim,
+                                                        sim=self.sim,
                                                         gpu=self.gpu)
 
             if self.current_gen == 0:
@@ -369,13 +362,13 @@ class Qes:
         # print(len(self.candidate_sol))
         # print(self.n_children)
 
-        if self.simulator == 'statevector':
-            self.noise = False
-        if self.noise:
-            backend = FakeMumbaiV2()
-            sim = AerSimulator.from_backend(backend)
-        else:
-            sim = Aer.get_backend(self.simulator + '_simulator')
+        #if self.simulator == 'statevector':
+        #    self.noise = False
+        #if self.noise:
+        #    backend = FakeMumbaiV2()
+        #    sim = AerSimulator.from_backend(backend)
+        #else:
+        #    sim = Aer.get_backend(self.simulator + '_simulator')
 
         # if there are more candidates than chosen number of children
         # Question: why?
@@ -387,7 +380,9 @@ class Qes:
                                                      n_ancillas=self.n_ancilla,
                                                      n_patches=self.n_patches,
                                                      pixels_per_patch=self.pixels_per_patch,
-                                                     sim=sim)
+                                                     gpu=self.gpu,
+                                                     device=self.device,
+                                                     sim=self.sim)
 
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
@@ -401,8 +396,9 @@ class Qes:
                                                    n_ancillas=self.n_ancilla,
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
-                                                   sim=sim,
-                                                   gpu=self.gpu))
+                                                   sim=self.sim,
+                                                   gpu=self.gpu,
+                                                   device=self.device))
             print(f'fitnesses: {self.fitnesses}')
             self.fitness_evaluations += 1
 
@@ -459,7 +455,6 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                # TODO: should this be argmin for my function??
                 index = np.argmax(self.fitnesses)  # index of the highest fitness value is
                 if self.fitnesses[index] > self.best_fitness[g - 1]:
                     print('improvement found')
