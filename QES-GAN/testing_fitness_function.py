@@ -17,7 +17,7 @@ def main():
     critic_net = critic_net.to(device)
     critic_net.load_state_dict(torch.load(
         '/Users/bmassacci/main_folder/maastricht/academics/quantum_thesis/scripts/QES-Bianca'
-        '/QuantumEvolutionaryAlgorithms/QES-GAN/output' + f"/critic-390.pt"))  # Note: hardcoded
+        '/QuantumEvolutionaryAlgorithms/QES-GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
     # for dev.
 
     # loading the dataset

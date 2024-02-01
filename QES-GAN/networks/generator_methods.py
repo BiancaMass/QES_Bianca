@@ -4,7 +4,7 @@ import torch
 from qiskit import execute
 
 
-def get_probabilities(quantum_circuit, n_tot_qubits, sim, gpu):
+def get_probabilities(quantum_circuit, n_tot_qubits, sim):
     """ Executes the given circuit on the given simulator, calculates and outputs the
     probabilities of each computational quantum state for the circuit.
     The probabilities are calculated as the square of the absolute value of each amplitude
@@ -19,14 +19,6 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim, gpu):
 
     p = np.zeros(2 ** n_tot_qubits)  # to store the probabilities
 
-    if gpu:
-        if torch.cuda.is_available():
-            sim.set_options(device='GPU')
-            print('GPU used.')
-        else:
-            print("Warning: GPU not available. Reverting to CPU.")
-            sim.set_options(device='CPU')  # Revert to CPU
-
     job = execute(quantum_circuit, sim)  # Execute the circuit `qc` on the simulator `sim`
     result = job.result()  # Retrieves the result of the execution
     statevector = result.get_statevector(quantum_circuit)
@@ -37,7 +29,7 @@ def get_probabilities(quantum_circuit, n_tot_qubits, sim, gpu):
     return p
 
 
-def from_probs_to_pixels(quantum_circuit, n_tot_qubits, n_ancillas, sim, gpu):
+def from_probs_to_pixels(quantum_circuit, n_tot_qubits, n_ancillas, sim):
     """
     Converts quantum circuit probabilities to normalized pixel values.
 
@@ -56,7 +48,7 @@ def from_probs_to_pixels(quantum_circuit, n_tot_qubits, n_ancillas, sim, gpu):
     """
 
     probs = get_probabilities(quantum_circuit=quantum_circuit, n_tot_qubits=n_tot_qubits,
-                              sim=sim, gpu=gpu)
+                              sim=sim)
     # Exclude the ancilla qubits values  # TODO: think about why this is done on a theoretical lvl
     probs_given_ancilla_0 = probs[:2 ** (n_tot_qubits - n_ancillas)]
     # making sure the sum is exactly 1.0
@@ -68,7 +60,7 @@ def from_probs_to_pixels(quantum_circuit, n_tot_qubits, n_ancillas, sim, gpu):
 
 
 def from_patches_to_image(quantum_circuit, n_tot_qubits, n_ancillas, n_patches, pixels_per_patch,
-                          sim, gpu):
+                          sim):
     """Constructs an image from quantum circuit generated patches. Iterates over a specified
     number of patches, generating each patch from a quantum circuit using the `from_probs_to_pixels`
     function. It then combines these patches to form a single image.
@@ -92,8 +84,7 @@ def from_patches_to_image(quantum_circuit, n_tot_qubits, n_ancillas, n_patches, 
         current_patch = from_probs_to_pixels(quantum_circuit=quantum_circuit,
                                              n_tot_qubits=n_tot_qubits,
                                              n_ancillas=n_ancillas,
-                                             sim=sim,
-                                             gpu=gpu)
+                                             sim=sim)
         current_patch = current_patch[:pixels_per_patch]
         # Note: This assumes patch is a row, as it does not take shape into account.
         current_patch = torch.reshape(torch.from_numpy(current_patch),

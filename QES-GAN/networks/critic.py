@@ -38,6 +38,8 @@ class ClassicalCritic(nn.Module):
             flat_list = list(itertools.chain(*itertools.chain(*x)))
             x = torch.tensor(flat_list).view(batch_size, self.image_shape[0],
                                              self.image_shape[1]).to(dtype=torch.float32)
+        else:
+            x = x.to(dtype=torch.float32)
 
         x = x.view(x.shape[0], -1)
 
