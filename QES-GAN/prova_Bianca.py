@@ -25,7 +25,7 @@ max_depth = 20
 device = torch.device("cpu")
 critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
 critic_net = critic_net.to(device)
-critic_net.load_state_dict(torch.load('./output/' + f"/critic-80.pt"))  # Note: hardcoded for dev.
+critic_net.load_state_dict(torch.load('./output/' + f"/critic-390.pt"))  # Note: hardcoded for dev.
 
 qes = qes.Qes(n_data_qubits=n_data_qubits,
               n_ancilla=n_ancilla,
