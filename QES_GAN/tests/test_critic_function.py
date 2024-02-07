@@ -14,7 +14,7 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    critic_net = ClassicalCritic(image_shape=(28,28))
+    critic_net = ClassicalCritic(image_shape=(28, 28))
     critic_net = critic_net.to(device)
     critic_net.load_state_dict(torch.load(
         '/Users/bmassacci/main_folder/maastricht/academics/quantum_thesis/scripts/QES-Bianca'
