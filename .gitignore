@@ -4,3 +4,4 @@ __pycache__/
 ../QES/trackhhl/event_model/__pycache__/event_model.cpython-310.pyc
 QES/
 QuantumES.py
+QES-GAN_outputs/
