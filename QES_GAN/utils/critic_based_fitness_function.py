@@ -2,9 +2,9 @@ import os
 import torch
 from statistics import mean
 from torch.utils.data import DataLoader
-from utils.dataset import load_mnist, select_from_dataset
-from networks.critic import ClassicalCritic
-from utils.plotting import plot_image_tensor
+from dataset import load_mnist, select_from_dataset
+from QuantumEvolutionaryAlgorithms.QES_GAN.networks.critic import ClassicalCritic
+from plotting import plot_image_tensor
 
 def main():
     image_size = 28
@@ -17,7 +17,7 @@ def main():
     critic_net = critic_net.to(device)
     critic_net.load_state_dict(torch.load(
         '/Users/bmassacci/main_folder/maastricht/academics/quantum_thesis/scripts/QES-Bianca'
-        '/QuantumEvolutionaryAlgorithms/QES-GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
+        '/QuantumEvolutionaryAlgorithms/QES_GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
     # for dev.
 
     # loading the dataset

@@ -9,8 +9,8 @@ n_data_qubits = training_config.N_DATA_QUBITS
 n_ancilla = training_config.N_ANCILLAS
 image_shape = (training_config.IMAGE_SIDE, training_config.IMAGE_SIDE)
 batch_size = training_config.BATCH_SIZE
-n_children = 8
-n_max_evaluations = 200
+n_children = 6
+n_max_evaluations = 30
 shots = 1000
 simulator = 'statevector'
 noise = False
@@ -33,7 +33,7 @@ print(f'Using device: {device}')
 critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
 critic_net = critic_net.to(device)
 current_working_directory = os.getcwd()
-critic_net_path = current_working_directory + '/QES-GAN/output/' + "critic-510.pt"
+critic_net_path = current_working_directory + '/output/' + "critic-510.pt"
 print(f'critic net path: {critic_net_path}')
 # Import pre-trained critic net
 critic_net.load_state_dict(torch.load(critic_net_path))

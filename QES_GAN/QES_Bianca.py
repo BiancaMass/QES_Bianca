@@ -499,4 +499,7 @@ class Qes:
                        algo.depth,
                        algo.best_actions, algo.best_fitness,
                        algo.best_fitness[-1]]
+
+        # TODO: save output file
+        # TODO: save best circuits and some random circuits, then run them on PQWGAN
         return self
