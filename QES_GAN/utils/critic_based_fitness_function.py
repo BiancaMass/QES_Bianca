@@ -2,7 +2,7 @@ import os
 import torch
 from statistics import mean
 from torch.utils.data import DataLoader
-from utils.dataset import load_mnist, select_from_dataset
+from dataset import load_mnist, select_from_dataset
 from networks.critic import ClassicalCritic
 from utils.plotting import plot_image_tensor
 

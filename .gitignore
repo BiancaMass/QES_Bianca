@@ -1,5 +1,5 @@
-QES-GAN/datasets
-QES-GAN/output
+QES_GAN/datasets
+QES_GAN/output
 __pycache__/
 ../QES/trackhhl/event_model/__pycache__/event_model.cpython-310.pyc
 QES/
