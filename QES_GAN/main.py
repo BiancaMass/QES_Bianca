@@ -1,7 +1,7 @@
 import torch
 import os
 from networks.critic import ClassicalCritic
-import QES_Bianca as qes
+import QES_GAN as qes
 import configs.training_config as training_config
 
 
@@ -9,16 +9,16 @@ n_data_qubits = training_config.N_DATA_QUBITS
 n_ancilla = training_config.N_ANCILLAS
 image_shape = (training_config.IMAGE_SIDE, training_config.IMAGE_SIDE)
 batch_size = training_config.BATCH_SIZE
-n_children = 6
-n_max_evaluations = 30
-shots = 1000
-simulator = 'statevector'
-noise = False
-dtheta = 0.1
-action_weights = [50, 10, 10, 30]
-multi_action_pb = 0.1
-max_gen_no_improvements = 10
-max_depth = 20
+n_children = training_config.N_CHILDREN
+n_max_evaluations = training_config.M_MAX_EVALUATIONS
+shots = training_config.SHOTS
+simulator = training_config.SIMULATOR
+noise = training_config.NOISE
+dtheta = training_config.DTHETA
+action_weights = training_config.ACTION_WEIGHTS
+multi_action_pb = training_config.MULTI_ACTION_PB
+max_gen_no_improvements = training_config.MAX_GEN_NO_IMPROVEMENT
+max_depth = training_config.MAX_DEPTH
 
 
 # device = torch.device("cpu")
