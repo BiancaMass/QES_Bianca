@@ -19,18 +19,18 @@ B1 = 0    # Beta1, the exponential decay rate for the 1st moment estimates. Defa
 B2 = 0.9  # Beta2, the exponential decay rate for the 2nd moment estimates. Default would be 0.999
 LAMBDA_GP = 10  # Coefficient for the gradient penalty
 
-#####################
-## IMAGE VARIABLES ##
-#####################
+######################
+## IMAGE PARAMETERS ##
+######################
 
 IMAGE_SIDE = 28
 CLASSES = [0, 1]  # This only works for MNIST, picks number classes as specified in list
 # Note: for development phase, I assume square images
 N_PIXELS = IMAGE_SIDE ** 2
 
-#######################
-## CIRCUIT VARIABLES ##
-#######################
+########################
+## CIRCUIT PARAMETERS ##
+########################
 # Note: assuming patches are rows
 N_PATCHES = IMAGE_SIDE
 PIXELS_PER_PATCH = int(N_PIXELS / N_PATCHES)  # TODO insert a control that this is an integer
@@ -39,3 +39,17 @@ N_ANCILLAS = 1
 # one patch
 N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2))
 
+#############################
+## EVOLUTIONARY PARAMETERS ##
+#############################
+
+N_CHILDREN = 6
+M_MAX_EVALUATIONS = 30
+SHOTS = 1000
+SIMULATOR = 'statevector'
+NOISE = False
+DTHETA = 0.1
+ACTION_WEIGHTS = [50, 10, 10, 30]
+MULTI_ACTION_PB = 0.1
+MAX_GEN_NO_IMPROVEMENT = 10
+MAX_DEPTH = 20
