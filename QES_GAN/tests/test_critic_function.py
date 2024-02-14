@@ -8,6 +8,14 @@ from QuantumEvolutionaryAlgorithms.QES_GAN.utils.plotting import plot_image_tens
 
 
 def main():
+    """
+    This function loads the target image dataset (e.g., mnist digits) and feeds it to a
+    pre-trained critic network, printing the score given by the network. The purpose is to gauge
+    the ability of the pre-trained network to detect whether images are generated or real,
+    and to get a sense of what kind of score the critic is giving for images that are real. Of
+    course, score accuracy entirely depends on the critic (how well trained it is).
+    """
+
     image_size = 28
     classes = [0, 1]
     batch_size = 32
