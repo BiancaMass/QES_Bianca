@@ -6,7 +6,7 @@ from QuantumEvolutionaryAlgorithms.QES_GAN.networks.generator_methods import fro
 
 def scoring_function(batch_size, critic, qc,
                      n_tot_qubits, n_ancillas, n_patches,
-                     pixels_per_patch, sim, device):
+                     pixels_per_patch, patch_width, patch_height, sim, device):
     """
     Calculates a score for a given quantum circuit based on a pre-trained critic network.
     The function generates a batch of images using the specified quantum circuit and latent vectors.
@@ -23,6 +23,9 @@ def scoring_function(batch_size, critic, qc,
     :param n_patches: int. The number of patches into which each image is divided.
     :param pixels_per_patch: int. The number of pixels in each patch of an image.
     :param sim: StatevectorSimulator. The simulator used to run the quantum circuit.
+    :param patch_width: width (in pixels) of each patch.
+    :param patch_height: height (in pixels) of each patch.
+    :param device: the device (cpu or gpu) on which computations are to be performed.
 
     :return: float. The average score for the generated batch of images, as evaluated by the critic.
     """
@@ -34,11 +37,13 @@ def scoring_function(batch_size, critic, qc,
                                                 n_ancillas=n_ancillas,
                                                 n_patches=n_patches,
                                                 pixels_per_patch=pixels_per_patch,
+                                                patch_width=patch_width,
+                                                patch_height=patch_height,
                                                 sim=sim)
         generated_images.append(generated_image)
 
     # Evaluate the generated images using the pre-trained critic network
-    print(f'Device used in generator_fitness_function: {device}')
+    # print(f'Device used in generator_fitness_function: {device}')
     # critic.to(device) # redundant
 
     generated_images_tensor = torch.stack(generated_images)
