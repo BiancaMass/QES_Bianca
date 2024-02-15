@@ -60,7 +60,7 @@ def calculate_fid(real_features, gen_features):
     # Calculate the sqrt of the product of covariances
     covmean = sqrtm(sigma1.dot(sigma2))
 
-    # Check for imaginary numbers
+    # Control for imaginary numbers
     if iscomplexobj(covmean):
         covmean = covmean.real
 
