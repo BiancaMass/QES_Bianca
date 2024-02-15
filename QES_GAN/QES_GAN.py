@@ -13,6 +13,7 @@ from decimal import Decimal, getcontext
 from networks.generator_methods import from_patches_to_image
 from utils.critic_based_fitness_function import scoring_function
 from utils.dataset import select_from_dataset, load_mnist
+from utils.plotting import plot_tensor
 from configs import training_config
 
 # np.random.seed(123)  # for replicability
@@ -59,9 +60,26 @@ class Qes:
         self.n_tot_qubits = n_data_qubits + n_ancilla
 
         self.image_width, self.image_height = image_shape[0], image_shape[1]
-        self.n_pixels = image_shape[0] * image_shape[1]
-        self.n_patches = image_shape[0]  # TODO hard coded for now assuming one patch per row
+        self.n_pixels = training_config.N_PIXELS
+
+        actual_n_pixels = self.image_width * self.image_height
+        if actual_n_pixels != self.n_pixels:
+            raise ValueError(f"Mismatch in the number of pixels: expected {self.n_pixels}, "
+                             f"but got {actual_n_pixels}(width: {self.image_width}, height:"
+                             f" {self.image_height}).")
+
+        self.n_patches = training_config.N_PATCHES
         self.pixels_per_patch = int(self.n_pixels/self.n_patches)
+        self.patch_width = training_config.PATCH_WIDTH
+        self.patch_height = training_config.PATCH_HEIGHT
+        if self.patch_height*self.patch_width*self.n_patches != actual_n_pixels:
+            raise ValueError(f"Mismatch in the number of total pixels and how they are "
+                             f"distributed among patches.\n"
+                             f"Number of total pixels:  {actual_n_pixels}   \n"
+                             f"Number of total patches: {self.n_patches}    \n"
+                             f"Individual patch width:  {self.patch_width}  \n"
+                             f"Individual patch height: {self.patch_height} \n")
+
         self.batch_size = batch_size
         self.critic_net = critic_net
 
@@ -111,17 +129,17 @@ class Qes:
         # Number of the computational basis states in the `n_qubits` qubits Hilbert space
         self.N = 2 ** self.n_tot_qubits
 
-        ### START VANILLA CIRCUIT ###
-        latent_vector_0 = np.random.rand(self.n_tot_qubits)
+        ### START 0-GEN CIRCUIT ###
+        self.latent_vector_0 = np.random.rand(self.n_tot_qubits)
 
         qc_0 = QuantumCircuit(QuantumRegister(self.n_tot_qubits, 'qubit'))
         # Applying RY rotations based on the latent vector
         for i in range(self.n_tot_qubits):
-            qc_0.ry(latent_vector_0[i], i)
+            qc_0.ry(self.latent_vector_0[i], i)
 
         for qbit in range(self.n_tot_qubits):
             qc_0.h(qbit)
-        ### END VANILLA CIRCUIT ###
+        ### END 0-GEN CIRCUIT ###
 
         # CURRENT generation parameters
         self.ind = qc_0  # best individual at the beginning is the vanilla circuit
@@ -206,15 +224,15 @@ class Qes:
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
                     # Choose the type of gate (pick an index for the gates list)
                     choice = random.randint(0, len(gate_list) - 1)
-                    if 0 <= choice < 3:
-                        print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
-                        gate_list[choice](angle, position[0])
-                    else:
-                        print(f"Adding a {gate_list[choice]} gate at positions: {position}")
-                        gate_list[choice](angle, position[0], position[1])
+                    # if 0 <= choice < 3:
+                    #     print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
+                    #     gate_list[choice](angle, position[0])
+                    # else:
+                    #     print(f"Adding a {gate_list[choice]} gate at positions: {position}")
+                    #     gate_list[choice](angle, position[0], position[1])
 
-                    print('Circuit after ADD ACTION:')
-                    print(qc)
+                    # print('Circuit after ADD ACTION:')
+                    # print(qc)
 
                 # DELETE a random gate in a random position of the parent quantum circuit
                 elif self.act_choice[j] == 'D':
@@ -223,8 +241,8 @@ class Qes:
                     # Exclude the the first n_tot_qubits gates (encoding gates)
                     position = random.randint(self.n_tot_qubits, len(qc.data) - 1)
                     qc.data.remove(qc.data[position])
-                    print("Circuit after DELETE action")
-                    print(qc)
+                    # print("Circuit after DELETE action")
+                    # print(qc)
 
                 # SWAP: Remove a random gate and replace it with a new gate randomly chosen
                 elif self.act_choice[j] == 'S':
@@ -275,8 +293,8 @@ class Qes:
                             element_to_remove[1] = qubits_
                             element_to_add = tuple(element_to_remove)
                             qc.data[position] = element_to_add
-                            print('Circuit after SWAP action')
-                            print(qc)
+                            # print('Circuit after SWAP action')
+                            # print(qc)
 
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
@@ -294,10 +312,10 @@ class Qes:
                         mutated_gate = gate_dict[gate_to_mutate[0].name](angle_new)
                         qc.data[position] = (mutated_gate, *gate_to_mutate[1:])
 
-                        print(
-                            f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')
-                        print('Circuit after MUTATE action')
-                        print(qc)
+                        # print(
+                        #     f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')
+                        # print('Circuit after MUTATE action')
+                        # print(qc)
                     else:
                         print('Skipping MUTATE action as there are no gates available for mutation')
 
@@ -312,9 +330,6 @@ class Qes:
         """
         It transforms a quantum circuit (ind) in a string of real values of length 2^N, where N=len(ind).
         """
-
-        latent_vector = np.random.rand(self.n_tot_qubits)  # TODO: this is not used!!
-        
         self.candidate_sol = []
         # Let qasm be more free because of the shot noise
         if self.simulator == 'qasm':
@@ -341,12 +356,13 @@ class Qes:
                 #     p[index] = Decimal(str(counts[i])) / Decimal(str(self.shots))
 
             elif self.simulator == 'statevector':
-                # TODO: ISSUE -> EACH ROW IS THE SAME!!
                 resulting_image = from_patches_to_image(quantum_circuit=qc,
                                                         n_tot_qubits=self.n_tot_qubits,
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
                                                         pixels_per_patch=self.pixels_per_patch,
+                                                        patch_width=self.patch_width,
+                                                        patch_height=self.patch_height,
                                                         sim=self.sim)
 
             if self.current_gen == 0:
@@ -382,8 +398,10 @@ class Qes:
                                                      n_ancillas=self.n_ancilla,
                                                      n_patches=self.n_patches,
                                                      pixels_per_patch=self.pixels_per_patch,
-                                                     device=self.device,
-                                                     sim=self.sim)
+                                                     patch_width=self.patch_width,
+                                                     patch_height=self.patch_height,
+                                                     sim=self.sim,
+                                                     device=self.device)
 
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
@@ -397,10 +415,12 @@ class Qes:
                                                    n_ancillas=self.n_ancilla,
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
+                                                   patch_width=self.patch_width,
+                                                   patch_height=self.patch_height,
                                                    sim=self.sim,
                                                    device=self.device))
-            print(f'fitnesses: {self.fitnesses}')
             self.fitness_evaluations += 1
+        print(f'fitnesses: {self.fitnesses}')
 
         if self.current_gen == 0:
             self.best_fitness.append(self.fitnesses[0])
@@ -420,9 +440,9 @@ class Qes:
         self.counting_multi_action = 0
         rand = random.uniform(0, 1)
         # Question: why set it this way? Repeated many times until random happens to be > m.a.probs.
-        # Note: like this, it does not increase counting_multi_action with a probability of
-        #  multi_action_pb because it does a series of independent runs. I wrote a code to see
-        #  how much it increased (see script-analysis.py).
+        # Like this, it does not increase counting_multi_action with a probability of
+        # multi_action_pb because it does a series of independent runs. I wrote a code to see
+        # how much it increased (see script-analysis.py).
         while rand < self.multi_action_pb:
             self.counting_multi_action += 1
             rand = random.uniform(0, 1)
@@ -455,14 +475,16 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                index = np.argmax(self.fitnesses)  # index of the highest fitness value is
-                if self.fitnesses[index] > self.best_fitness[g - 1]:
+                index = np.argmin(self.fitnesses)  # index of the highest fitness value is
+                if self.fitnesses[index] < self.best_fitness[g - 1]:
                     print('improvement found')
                     self.best_individuals.append(self.population[index])
                     self.ind = self.population[index]
                     self.depth.append(self.ind.depth())
                     self.best_fitness.append(self.fitnesses[index])
                     self.best_solution.append(self.candidate_sol[index])
+                    # if g % 30 == 0: # Plot best image every 30 generations
+                    #     plot_tensor(self.best_solution[-1].squeeze())
                     for i in range(self.counting_multi_action + 1):
                         self.best_actions.append(self.act_choice[i])
 

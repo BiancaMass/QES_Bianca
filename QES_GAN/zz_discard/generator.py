@@ -5,7 +5,9 @@ import torch.nn as nn
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
 from qiskit.circuit import Parameter
 
+# TODO: delete, this is obsolete
 
+"""
 class Q_Generator(nn.Module):
     # TODO: this will have to become parameterized in order to change ansatz structure each time
     # TODO: documentation of all functions
@@ -87,4 +89,4 @@ class Q_Generator(nn.Module):
                 patches = torch.cat((current_patch, patches))
             images_batch[batch_image_index] = patches
 
-        return images_batch
+        return images_batch"""
