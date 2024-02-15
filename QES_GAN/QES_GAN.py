@@ -1,11 +1,9 @@
-"""
-Vincenzo's code, edited by Bianca.
-"""
-
+import os
 import numpy as np
 import random
 import math
 import torch
+from torch.utils.data import DataLoader
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
 from qiskit.circuit.library import RYGate, RXGate, RZGate, RXXGate, RYYGate, RZZGate
 from qiskit_aer import AerSimulator
@@ -13,7 +11,9 @@ from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
 from networks.generator_methods import from_patches_to_image
-from generator_fitness_function import scoring_function
+from utils.critic_based_fitness_function import scoring_function
+from utils.dataset import select_from_dataset, load_mnist
+from configs import training_config
 
 # np.random.seed(123)  # for replicability
 
@@ -94,6 +94,17 @@ class Qes:
         self.n_generations = math.ceil(n_max_evaluations / n_children)
 
         #######################
+        # LOAD THE TARGET DATASET (needed to evaluate the circuit)
+        #######################
+
+        # # loading the dataset
+        # os.chdir(os.path.dirname(os.path.abspath(__file__)))  # setting path to dir of this file
+        # dataset = select_from_dataset(dataset=load_mnist(image_size=training_config.IMAGE_SIDE),
+        #                               per_class_size=1000,
+        #                               labels=training_config.CLASSES)
+        # self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+
+        #######################
         # CREATE THE 0-TH INDIVIDUAL (QUANTUM CIRCUIT)
         #######################
 
@@ -155,7 +166,6 @@ class Qes:
 
         print('Initial quantum circuit: \n', self.ind)
 
-        
     def action(self):
         """ It generates n_children of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
         delete, swap, mutate) on each of them. Then the new quantum circuits are stored in the
@@ -358,8 +368,9 @@ class Qes:
         """
         # Create an empty list to store calculated fitness values
         self.fitnesses = []
-        # print(len(self.candidate_sol))
-        # print(self.n_children)
+
+        # for i, (real_images, _) in enumerate(self.dataloader):
+        #     real_images = real_images.to(self.device)
 
         # if there are more candidates than chosen number of children
         # Question: why?

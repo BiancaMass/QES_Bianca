@@ -2,23 +2,31 @@ import os
 import torch
 from statistics import mean
 from torch.utils.data import DataLoader
-from utils.dataset import load_mnist, select_from_dataset
-from networks.critic import ClassicalCritic
-from utils.plotting import plot_image_tensor
+from QuantumEvolutionaryAlgorithms.QES_GAN.utils.dataset import load_mnist, select_from_dataset
+from QuantumEvolutionaryAlgorithms.QES_GAN.networks.critic import ClassicalCritic
+from QuantumEvolutionaryAlgorithms.QES_GAN.utils.plotting import plot_image_tensor
+
 
 def main():
+    """
+    This function loads the target image dataset (e.g., mnist digits) and feeds it to a
+    pre-trained critic network, printing the score given by the network. The purpose is to gauge
+    the ability of the pre-trained network to detect whether images are generated or real,
+    and to get a sense of what kind of score the critic is giving for images that are real. Of
+    course, score accuracy entirely depends on the critic (how well trained it is).
+    """
+
     image_size = 28
     classes = [0, 1]
     batch_size = 32
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    critic_net = ClassicalCritic(image_shape=(28,28))
+    critic_net = ClassicalCritic(image_shape=(28, 28))
     critic_net = critic_net.to(device)
     critic_net.load_state_dict(torch.load(
         '/Users/bmassacci/main_folder/maastricht/academics/quantum_thesis/scripts/QES-Bianca'
-        '/QuantumEvolutionaryAlgorithms/QES-GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
-    # for dev.
+        '/QuantumEvolutionaryAlgorithms/QES_GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
 
     # loading the dataset
     os.chdir(os.path.dirname(os.path.abspath(__file__)))  # making sure the dir path is right
