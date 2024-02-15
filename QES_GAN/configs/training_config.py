@@ -32,8 +32,13 @@ N_PIXELS = IMAGE_SIDE ** 2
 ## CIRCUIT PARAMETERS ##
 ########################
 # Note: assuming patches are rows
-N_PATCHES = IMAGE_SIDE
-PIXELS_PER_PATCH = int(N_PIXELS / N_PATCHES)  # TODO insert a control that this is an integer
+# N_PATCHES = IMAGE_SIDE
+# Note: if instead each image is generated at once:
+N_PATCHES = 1
+PIXELS_PER_PATCH = int(N_PIXELS / N_PATCHES)
+PATCH_WIDTH = int(IMAGE_SIDE)  # Note: executive decision that each patch is a row or multiple few
+# rows
+PATCH_HEIGHT = int((N_PIXELS / N_PATCHES) / PATCH_WIDTH)
 N_ANCILLAS = 1
 # Data qubit determined by the number of qubits required to generate as many pixels as needed per
 # one patch
@@ -43,9 +48,9 @@ N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2
 ## EVOLUTIONARY PARAMETERS ##
 #############################
 
-N_CHILDREN = 6
-M_MAX_EVALUATIONS = 30
-SHOTS = 1000
+N_CHILDREN = 5
+M_MAX_EVALUATIONS = 200
+SHOTS = 5000  # maybe 10000-20000 better for 11 qubits
 SIMULATOR = 'statevector'
 NOISE = False
 DTHETA = 0.1
