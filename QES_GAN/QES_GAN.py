@@ -2,6 +2,8 @@ import os
 import numpy as np
 import random
 import math
+import csv
+from datetime import datetime
 import torch
 from torch.utils.data import DataLoader
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
@@ -526,13 +528,47 @@ class Qes:
         return self
 
     def data(self):
-        """ It stores in output all the data required of the algorithm during the evolution"""
+        """ It stores all the data required of the algorithm during the evolution"""
         algo = self.evolution()
         self.output = [algo.best_solution, algo.best_individuals[0], algo.best_individuals[-1],
                        algo.depth,
                        algo.best_actions, algo.best_fitness,
                        algo.best_fitness[-1]]
 
-        # TODO: save output file
-        # TODO: save best circuits and some random circuits, then run them on PQWGAN
+        # Define the headings for the CSV file
+        headings = ["Best Solution", "Best Individual - Start", "Best Individual - End",
+                    "Depth", "Best Actions", "Best Fitness", "Final Best Fitness"]
+
+        # Quantum circuit as qasm file
+        qasm_best_end = algo.best_individuals[-1].qasm()
+
+        # Generate a filename based on the current date and time
+        now = datetime.now()  # current date and time
+        date_time = now.strftime("%y_%m_%d_%H_%M_%S")
+
+        # Look if the output directory exists, if not, create it
+        output_dir = os.path.join("output", f"{date_time}")
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        filename_csv = os.path.join(output_dir, f"{self.n_children}_"
+                                            f"{self.n_generations}_{self.max_depth}_"
+                                            f"{self.n_patches}_{self.n_tot_qubits}_"
+                                            f"{self.n_ancilla}.csv")
+
+        filename_qasm = os.path.join(output_dir, f'final_best_ciruit.qasm')
+
+        # Write the data to the CSV file
+        with open(filename_csv, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headings)
+            # Assuming each entry in self.output is iterable and aligned with the headings
+            writer.writerow(self.output)
+
+        with open(filename_qasm, "w") as file:
+            file.write(qasm_best_end)
+
+        print(f"Output saved to {filename_csv} and {filename_qasm}")
+
+        # TODO: save also some random circuits, then run them on PQWGAN to see what you get
         return self
