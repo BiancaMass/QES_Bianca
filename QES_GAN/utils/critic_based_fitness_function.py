@@ -29,7 +29,6 @@ def scoring_function(batch_size, critic, qc,
 
     :return: float. The average score for the generated batch of images, as evaluated by the critic.
     """
-    latent_vector = np.random.rand(batch_size, n_tot_qubits)
     generated_images = []
     for batch_index in range(batch_size):
         generated_image = from_patches_to_image(quantum_circuit=qc,
