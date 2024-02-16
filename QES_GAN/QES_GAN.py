@@ -15,7 +15,7 @@ from decimal import Decimal, getcontext
 from networks.generator_methods import from_patches_to_image
 from utils.critic_based_fitness_function import scoring_function
 from utils.dataset import select_from_dataset, load_mnist
-from utils.plotting import plot_tensor
+from utils.plotting import save_tensor
 from configs import training_config
 
 # np.random.seed(123)  # for replicability
@@ -183,6 +183,13 @@ class Qes:
             self.max_depth = max_depth
         # All the algorithm data we need to store
         self.output = None
+
+        # Set output directory path
+        self.output_dir = os.path.join("output", datetime.now().strftime("%y_%m_%d_%H_%M_%S"))
+        if not os.path.exists(self.output_dir):
+            print("Creating output directory")
+            os.makedirs(self.output_dir)
+            print(f"Output directory created: {self.output_dir}")
 
         print('Initial quantum circuit: \n', self.ind)
 
@@ -485,8 +492,6 @@ class Qes:
                     self.depth.append(self.ind.depth())
                     self.best_fitness.append(self.fitnesses[index])
                     self.best_solution.append(self.candidate_sol[index])
-                    # if g % 30 == 0: # Plot best image every 30 generations
-                    #     plot_tensor(self.best_solution[-1].squeeze())
                     for i in range(self.counting_multi_action + 1):
                         self.best_actions.append(self.act_choice[i])
 
@@ -499,6 +504,13 @@ class Qes:
                     self.depth.append(self.ind.depth())
                     self.best_fitness.append(self.best_fitness[g - 1])
                     self.best_solution.append(self.best_solution[g - 1])
+
+                # Save best image every 10 generations
+                if g % 10 == 0:
+                    image_filename = os.path.join(self.output_dir, f"best_solution_{g}.png")
+                    save_tensor(tensor=self.best_solution[-1].squeeze(),
+                                filename=image_filename)
+
                 print('best qc:\n_qubits', self.ind)
                 print('circuit depth:', self.depth[g])
                 # print('best solution so far:\n_qubits', self.best_solution[g])
@@ -542,21 +554,16 @@ class Qes:
         # Quantum circuit as qasm file
         qasm_best_end = algo.best_individuals[-1].qasm()
 
-        # Generate a filename based on the current date and time
-        now = datetime.now()  # current date and time
-        date_time = now.strftime("%y_%m_%d_%H_%M_%S")
-
         # Look if the output directory exists, if not, create it
-        output_dir = os.path.join("output", f"{date_time}")
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
-        filename_csv = os.path.join(output_dir, f"{self.n_children}_"
+        filename_csv = os.path.join(self.output_dir, f"{self.n_children}_"
                                             f"{self.n_generations}_{self.max_depth}_"
                                             f"{self.n_patches}_{self.n_tot_qubits}_"
                                             f"{self.n_ancilla}.csv")
 
-        filename_qasm = os.path.join(output_dir, f'final_best_ciruit.qasm')
+        filename_qasm = os.path.join(self.output_dir, f'final_best_ciruit.qasm')
 
         # Write the data to the CSV file
         with open(filename_csv, mode='w', newline='') as file:
