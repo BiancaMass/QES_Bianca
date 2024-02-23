@@ -18,7 +18,7 @@ def main():
 
     image_size = 28
     classes = [0, 1]
-    batch_size = 32
+    batch_size = 25
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
@@ -26,7 +26,8 @@ def main():
     critic_net = critic_net.to(device)
     critic_net.load_state_dict(torch.load(
         '/Users/bmassacci/main_folder/maastricht/academics/quantum_thesis/scripts/QES-Bianca'
-        '/QuantumEvolutionaryAlgorithms/QES_GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
+        '/QuantumEvolutionaryAlgorithms/QES_GAN/output' + f"/critic_300_classic.pt",
+        map_location=device))  # Note: path is hardcoded
 
     # loading the dataset
     os.chdir(os.path.dirname(os.path.abspath(__file__)))  # making sure the dir path is right

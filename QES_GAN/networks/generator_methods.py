@@ -49,7 +49,6 @@ def from_probs_to_pixels(quantum_circuit, n_tot_qubits, n_ancillas, sim):
 
     probs = get_probabilities(quantum_circuit=quantum_circuit, n_tot_qubits=n_tot_qubits,
                               sim=sim)
-    # Exclude the ancilla qubits values  # Question: why this is done on a theoretical level
     probs_given_ancilla_0 = probs[:2 ** (n_tot_qubits - n_ancillas)]
     # making sure the sum is exactly 1.0
     post_measurement_probs = probs_given_ancilla_0 / sum(probs_given_ancilla_0)

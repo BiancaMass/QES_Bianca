@@ -227,7 +227,7 @@ class Qes:
             for j in range(counter):  # go over the selected actions for this one child
                 # ADD a random gate on a random qubit at the end of the parent quantum circuit
                 if self.act_choice[j] == 'A':
-                    print("ADDING action was selected \n")
+                    # print("ADDING action was selected \n")
                     # Chooses 2 locations for the destination qubit(s). Only one will be used for
                     # rx, ry, rz, two will be used for rxx, ryy, rzz
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
@@ -245,7 +245,7 @@ class Qes:
 
                 # DELETE a random gate in a random position of the parent quantum circuit
                 elif self.act_choice[j] == 'D':
-                    print("DELETE action was selected")
+                    # print("DELETE action was selected")
                     # Pick a position for the gate to remove.
                     # Exclude the the first n_tot_qubits gates (encoding gates)
                     position = random.randint(self.n_tot_qubits, len(qc.data) - 1)
@@ -255,7 +255,7 @@ class Qes:
 
                 # SWAP: Remove a random gate and replace it with a new gate randomly chosen
                 elif self.act_choice[j] == 'S':
-                    print("SWAP action was selected \n")
+                    # print("SWAP action was selected \n")
                     if len(qc.data) - 1 - self.n_tot_qubits > 0:
                         # Pick a position for the gate to swap
                         # Exclude the the first n_tot_qubits gates (encoding gates)
@@ -263,7 +263,7 @@ class Qes:
                         remove_ok = True
                     else:
                         # Handle the case where there are not enough gates to swap
-                        print("Not enough gates to perform SWAP action.")
+                        # print("Not enough gates to perform SWAP action.")
                         remove_ok = False
 
                     if remove_ok:
@@ -307,7 +307,7 @@ class Qes:
 
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
-                    print("MUTATE action was selected \n")
+                    # print("MUTATE action was selected \n")
                     to_not_select = 'h'
                     gates_to_mutate = [i for i, gate in enumerate(qc.data[self.n_tot_qubits:],
                                                                   start=self.n_tot_qubits)
@@ -326,7 +326,8 @@ class Qes:
                         # print('Circuit after MUTATE action')
                         # print(qc)
                     else:
-                        print('Skipping MUTATE action as there are no gates available for mutation')
+                        pass
+                        # print('Skipping MUTATE action as there are no gates available for mutation')
 
                 # In case of multiactions we are appending more circuits to the population,
                 # if you don't want that put the next code line outside of the for loop on counter
@@ -484,8 +485,8 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                index = np.argmin(self.fitnesses)  # index of the highest fitness value is
-                if self.fitnesses[index] < self.best_fitness[g - 1]:
+                index = np.argmax(self.fitnesses)  # index of the best (greatest) fitness value
+                if self.fitnesses[index] > self.best_fitness[g - 1]:
                     print('improvement found')
                     self.best_individuals.append(self.population[index])
                     self.ind = self.population[index]
@@ -506,7 +507,7 @@ class Qes:
                     self.best_solution.append(self.best_solution[g - 1])
 
                 # Save best image every 10 generations
-                if g % 10 == 0:
+                if g % 40 == 0:
                     image_filename = os.path.join(self.output_dir, f"best_solution_{g}.png")
                     save_tensor(tensor=self.best_solution[-1].squeeze(),
                                 filename=image_filename)

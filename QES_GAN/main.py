@@ -21,7 +21,6 @@ def main():
     max_gen_no_improvements = training_config.MAX_GEN_NO_IMPROVEMENT
     max_depth = training_config.MAX_DEPTH
 
-
     # device = torch.device("cpu")
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if torch.cuda.is_available():
@@ -34,10 +33,10 @@ def main():
     critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
     critic_net = critic_net.to(device)
     current_working_directory = os.getcwd()
-    critic_net_path = current_working_directory + '/output/' + "critic-510.pt"
+    critic_net_path = current_working_directory + '/output/' + "critic_300_classic.pt" # Note: Hard coded
     print(f'critic net path: {critic_net_path}')
     # Import pre-trained critic net
-    critic_net.load_state_dict(torch.load(critic_net_path))
+    critic_net.load_state_dict(torch.load(critic_net_path, map_location=device))
 
     qes = qes_gan.Qes(n_data_qubits=n_data_qubits,
                   n_ancilla=n_ancilla,
