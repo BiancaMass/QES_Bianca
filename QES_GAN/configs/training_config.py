@@ -49,7 +49,7 @@ N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2
 #############################
 
 N_CHILDREN = 6
-M_MAX_EVALUATIONS = 800
+M_MAX_EVALUATIONS = 1500
 SHOTS = 5000  # maybe 10000-20000 better for 11 qubits
 SIMULATOR = 'statevector'
 NOISE = False
