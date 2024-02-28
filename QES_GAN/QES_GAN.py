@@ -233,12 +233,12 @@ class Qes:
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
                     # Choose the type of gate (pick an index for the gates list)
                     choice = random.randint(0, len(gate_list) - 1)
-                    # if 0 <= choice < 3:
-                    #     print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
-                    #     gate_list[choice](angle, position[0])
-                    # else:
-                    #     print(f"Adding a {gate_list[choice]} gate at positions: {position}")
-                    #     gate_list[choice](angle, position[0], position[1])
+                    if 0 <= choice < 3:
+                        # print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
+                        gate_list[choice](angle, position[0])
+                    else:
+                        # print(f"Adding a {gate_list[choice]} gate at positions: {position}")
+                        gate_list[choice](angle, position[0], position[1])
 
                     # print('Circuit after ADD ACTION:')
                     # print(qc)
