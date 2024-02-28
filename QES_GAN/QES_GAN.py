@@ -1,11 +1,11 @@
-"""
-Vincenzo's code, edited by Bianca.
-"""
-
+import os
 import numpy as np
 import random
 import math
+import csv
+from datetime import datetime
 import torch
+from torch.utils.data import DataLoader
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
 from qiskit.circuit.library import RYGate, RXGate, RZGate, RXXGate, RYYGate, RZZGate
 from qiskit_aer import AerSimulator
@@ -13,7 +13,10 @@ from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
 from networks.generator_methods import from_patches_to_image
-from generator_fitness_function import scoring_function
+from utils.critic_based_fitness_function import scoring_function
+from utils.dataset import select_from_dataset, load_mnist
+from utils.plotting import save_tensor
+from configs import training_config
 
 # np.random.seed(123)  # for replicability
 
@@ -59,9 +62,26 @@ class Qes:
         self.n_tot_qubits = n_data_qubits + n_ancilla
 
         self.image_width, self.image_height = image_shape[0], image_shape[1]
-        self.n_pixels = image_shape[0] * image_shape[1]
-        self.n_patches = image_shape[0]  # TODO hard coded for now assuming one patch per row
+        self.n_pixels = training_config.N_PIXELS
+
+        actual_n_pixels = self.image_width * self.image_height
+        if actual_n_pixels != self.n_pixels:
+            raise ValueError(f"Mismatch in the number of pixels: expected {self.n_pixels}, "
+                             f"but got {actual_n_pixels}(width: {self.image_width}, height:"
+                             f" {self.image_height}).")
+
+        self.n_patches = training_config.N_PATCHES
         self.pixels_per_patch = int(self.n_pixels/self.n_patches)
+        self.patch_width = training_config.PATCH_WIDTH
+        self.patch_height = training_config.PATCH_HEIGHT
+        if self.patch_height*self.patch_width*self.n_patches != actual_n_pixels:
+            raise ValueError(f"Mismatch in the number of total pixels and how they are "
+                             f"distributed among patches.\n"
+                             f"Number of total pixels:  {actual_n_pixels}   \n"
+                             f"Number of total patches: {self.n_patches}    \n"
+                             f"Individual patch width:  {self.patch_width}  \n"
+                             f"Individual patch height: {self.patch_height} \n")
+
         self.batch_size = batch_size
         self.critic_net = critic_net
 
@@ -94,23 +114,34 @@ class Qes:
         self.n_generations = math.ceil(n_max_evaluations / n_children)
 
         #######################
+        # LOAD THE TARGET DATASET (needed to evaluate the circuit)
+        #######################
+
+        # # loading the dataset
+        # os.chdir(os.path.dirname(os.path.abspath(__file__)))  # setting path to dir of this file
+        # dataset = select_from_dataset(dataset=load_mnist(image_size=training_config.IMAGE_SIDE),
+        #                               per_class_size=1000,
+        #                               labels=training_config.CLASSES)
+        # self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+
+        #######################
         # CREATE THE 0-TH INDIVIDUAL (QUANTUM CIRCUIT)
         #######################
 
         # Number of the computational basis states in the `n_qubits` qubits Hilbert space
         self.N = 2 ** self.n_tot_qubits
 
-        ### START VANILLA CIRCUIT ###
-        latent_vector_0 = np.random.rand(self.n_tot_qubits)
+        ### START 0-GEN CIRCUIT ###
+        self.latent_vector_0 = np.random.rand(self.n_tot_qubits)
 
         qc_0 = QuantumCircuit(QuantumRegister(self.n_tot_qubits, 'qubit'))
         # Applying RY rotations based on the latent vector
         for i in range(self.n_tot_qubits):
-            qc_0.ry(latent_vector_0[i], i)
+            qc_0.ry(self.latent_vector_0[i], i)
 
         for qbit in range(self.n_tot_qubits):
             qc_0.h(qbit)
-        ### END VANILLA CIRCUIT ###
+        ### END 0-GEN CIRCUIT ###
 
         # CURRENT generation parameters
         self.ind = qc_0  # best individual at the beginning is the vanilla circuit
@@ -153,9 +184,15 @@ class Qes:
         # All the algorithm data we need to store
         self.output = None
 
+        # Set output directory path
+        self.output_dir = os.path.join("output", datetime.now().strftime("%y_%m_%d_%H_%M_%S"))
+        if not os.path.exists(self.output_dir):
+            print("Creating output directory")
+            os.makedirs(self.output_dir)
+            print(f"Output directory created: {self.output_dir}")
+
         print('Initial quantum circuit: \n', self.ind)
 
-        
     def action(self):
         """ It generates n_children of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
         delete, swap, mutate) on each of them. Then the new quantum circuits are stored in the
@@ -190,35 +227,35 @@ class Qes:
             for j in range(counter):  # go over the selected actions for this one child
                 # ADD a random gate on a random qubit at the end of the parent quantum circuit
                 if self.act_choice[j] == 'A':
-                    print("ADDING action was selected \n")
+                    # print("ADDING action was selected \n")
                     # Chooses 2 locations for the destination qubit(s). Only one will be used for
                     # rx, ry, rz, two will be used for rxx, ryy, rzz
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
                     # Choose the type of gate (pick an index for the gates list)
                     choice = random.randint(0, len(gate_list) - 1)
                     if 0 <= choice < 3:
-                        print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
+                        # print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
                         gate_list[choice](angle, position[0])
                     else:
-                        print(f"Adding a {gate_list[choice]} gate at positions: {position}")
+                        # print(f"Adding a {gate_list[choice]} gate at positions: {position}")
                         gate_list[choice](angle, position[0], position[1])
 
-                    print('Circuit after ADD ACTION:')
-                    print(qc)
+                    # print('Circuit after ADD ACTION:')
+                    # print(qc)
 
                 # DELETE a random gate in a random position of the parent quantum circuit
                 elif self.act_choice[j] == 'D':
-                    print("DELETE action was selected")
+                    # print("DELETE action was selected")
                     # Pick a position for the gate to remove.
                     # Exclude the the first n_tot_qubits gates (encoding gates)
                     position = random.randint(self.n_tot_qubits, len(qc.data) - 1)
                     qc.data.remove(qc.data[position])
-                    print("Circuit after DELETE action")
-                    print(qc)
+                    # print("Circuit after DELETE action")
+                    # print(qc)
 
                 # SWAP: Remove a random gate and replace it with a new gate randomly chosen
                 elif self.act_choice[j] == 'S':
-                    print("SWAP action was selected \n")
+                    # print("SWAP action was selected \n")
                     if len(qc.data) - 1 - self.n_tot_qubits > 0:
                         # Pick a position for the gate to swap
                         # Exclude the the first n_tot_qubits gates (encoding gates)
@@ -226,7 +263,7 @@ class Qes:
                         remove_ok = True
                     else:
                         # Handle the case where there are not enough gates to swap
-                        print("Not enough gates to perform SWAP action.")
+                        # print("Not enough gates to perform SWAP action.")
                         remove_ok = False
 
                     if remove_ok:
@@ -265,12 +302,12 @@ class Qes:
                             element_to_remove[1] = qubits_
                             element_to_add = tuple(element_to_remove)
                             qc.data[position] = element_to_add
-                            print('Circuit after SWAP action')
-                            print(qc)
+                            # print('Circuit after SWAP action')
+                            # print(qc)
 
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
-                    print("MUTATE action was selected \n")
+                    # print("MUTATE action was selected \n")
                     to_not_select = 'h'
                     gates_to_mutate = [i for i, gate in enumerate(qc.data[self.n_tot_qubits:],
                                                                   start=self.n_tot_qubits)
@@ -284,12 +321,13 @@ class Qes:
                         mutated_gate = gate_dict[gate_to_mutate[0].name](angle_new)
                         qc.data[position] = (mutated_gate, *gate_to_mutate[1:])
 
-                        print(
-                            f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')
-                        print('Circuit after MUTATE action')
-                        print(qc)
+                        # print(
+                        #     f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')
+                        # print('Circuit after MUTATE action')
+                        # print(qc)
                     else:
-                        print('Skipping MUTATE action as there are no gates available for mutation')
+                        pass
+                        # print('Skipping MUTATE action as there are no gates available for mutation')
 
                 # In case of multiactions we are appending more circuits to the population,
                 # if you don't want that put the next code line outside of the for loop on counter
@@ -302,9 +340,6 @@ class Qes:
         """
         It transforms a quantum circuit (ind) in a string of real values of length 2^N, where N=len(ind).
         """
-
-        latent_vector = np.random.rand(self.n_tot_qubits)  # TODO: this is not used!!
-        
         self.candidate_sol = []
         # Let qasm be more free because of the shot noise
         if self.simulator == 'qasm':
@@ -331,12 +366,13 @@ class Qes:
                 #     p[index] = Decimal(str(counts[i])) / Decimal(str(self.shots))
 
             elif self.simulator == 'statevector':
-                # TODO: ISSUE -> EACH ROW IS THE SAME!!
                 resulting_image = from_patches_to_image(quantum_circuit=qc,
                                                         n_tot_qubits=self.n_tot_qubits,
                                                         n_ancillas=self.n_ancilla,
                                                         n_patches=self.n_patches,
                                                         pixels_per_patch=self.pixels_per_patch,
+                                                        patch_width=self.patch_width,
+                                                        patch_height=self.patch_height,
                                                         sim=self.sim)
 
             if self.current_gen == 0:
@@ -358,8 +394,9 @@ class Qes:
         """
         # Create an empty list to store calculated fitness values
         self.fitnesses = []
-        # print(len(self.candidate_sol))
-        # print(self.n_children)
+
+        # for i, (real_images, _) in enumerate(self.dataloader):
+        #     real_images = real_images.to(self.device)
 
         # if there are more candidates than chosen number of children
         # Question: why?
@@ -371,8 +408,10 @@ class Qes:
                                                      n_ancillas=self.n_ancilla,
                                                      n_patches=self.n_patches,
                                                      pixels_per_patch=self.pixels_per_patch,
-                                                     device=self.device,
-                                                     sim=self.sim)
+                                                     patch_width=self.patch_width,
+                                                     patch_height=self.patch_height,
+                                                     sim=self.sim,
+                                                     device=self.device)
 
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
@@ -386,10 +425,12 @@ class Qes:
                                                    n_ancillas=self.n_ancilla,
                                                    n_patches=self.n_patches,
                                                    pixels_per_patch=self.pixels_per_patch,
+                                                   patch_width=self.patch_width,
+                                                   patch_height=self.patch_height,
                                                    sim=self.sim,
                                                    device=self.device))
-            print(f'fitnesses: {self.fitnesses}')
             self.fitness_evaluations += 1
+        print(f'fitnesses: {self.fitnesses}')
 
         if self.current_gen == 0:
             self.best_fitness.append(self.fitnesses[0])
@@ -409,9 +450,9 @@ class Qes:
         self.counting_multi_action = 0
         rand = random.uniform(0, 1)
         # Question: why set it this way? Repeated many times until random happens to be > m.a.probs.
-        # Note: like this, it does not increase counting_multi_action with a probability of
-        #  multi_action_pb because it does a series of independent runs. I wrote a code to see
-        #  how much it increased (see script-analysis.py).
+        # Like this, it does not increase counting_multi_action with a probability of
+        # multi_action_pb because it does a series of independent runs. I wrote a code to see
+        # how much it increased (see script-analysis.py).
         while rand < self.multi_action_pb:
             self.counting_multi_action += 1
             rand = random.uniform(0, 1)
@@ -444,7 +485,7 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                index = np.argmax(self.fitnesses)  # index of the highest fitness value is
+                index = np.argmax(self.fitnesses)  # index of the best (greatest) fitness value
                 if self.fitnesses[index] > self.best_fitness[g - 1]:
                     print('improvement found')
                     self.best_individuals.append(self.population[index])
@@ -464,6 +505,13 @@ class Qes:
                     self.depth.append(self.ind.depth())
                     self.best_fitness.append(self.best_fitness[g - 1])
                     self.best_solution.append(self.best_solution[g - 1])
+
+                # Save best image every 10 generations
+                if g % 40 == 0:
+                    image_filename = os.path.join(self.output_dir, f"best_solution_{g}.png")
+                    save_tensor(tensor=self.best_solution[-1].squeeze(),
+                                filename=image_filename)
+
                 print('best qc:\n_qubits', self.ind)
                 print('circuit depth:', self.depth[g])
                 # print('best solution so far:\n_qubits', self.best_solution[g])
@@ -493,13 +541,42 @@ class Qes:
         return self
 
     def data(self):
-        """ It stores in output all the data required of the algorithm during the evolution"""
+        """ It stores all the data required of the algorithm during the evolution"""
         algo = self.evolution()
         self.output = [algo.best_solution, algo.best_individuals[0], algo.best_individuals[-1],
                        algo.depth,
                        algo.best_actions, algo.best_fitness,
                        algo.best_fitness[-1]]
 
-        # TODO: save output file
-        # TODO: save best circuits and some random circuits, then run them on PQWGAN
+        # Define the headings for the CSV file
+        headings = ["Best Solution", "Best Individual - Start", "Best Individual - End",
+                    "Depth", "Best Actions", "Best Fitness", "Final Best Fitness"]
+
+        # Quantum circuit as qasm file
+        qasm_best_end = algo.best_individuals[-1].qasm()
+
+        # Look if the output directory exists, if not, create it
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+        filename_csv = os.path.join(self.output_dir, f"{self.n_children}_"
+                                            f"{self.n_generations}_{self.max_depth}_"
+                                            f"{self.n_patches}_{self.n_tot_qubits}_"
+                                            f"{self.n_ancilla}.csv")
+
+        filename_qasm = os.path.join(self.output_dir, f'final_best_ciruit.qasm')
+
+        # Write the data to the CSV file
+        with open(filename_csv, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(headings)
+            # Assuming each entry in self.output is iterable and aligned with the headings
+            writer.writerow(self.output)
+
+        with open(filename_qasm, "w") as file:
+            file.write(qasm_best_end)
+
+        print(f"Output saved to {filename_csv} and {filename_qasm}")
+
+        # TODO: save also some random circuits, then run them on PQWGAN to see what you get
         return self

@@ -1,43 +1,56 @@
-import os
+import numpy as np
 import torch
-from statistics import mean
-from torch.utils.data import DataLoader
-from dataset import load_mnist, select_from_dataset
-from QuantumEvolutionaryAlgorithms.QES_GAN.networks.critic import ClassicalCritic
-from plotting import plot_image_tensor
 
-def main():
-    image_size = 28
-    classes = [0, 1]
-    batch_size = 32
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-
-    critic_net = ClassicalCritic(image_shape=(28,28))
-    critic_net = critic_net.to(device)
-    critic_net.load_state_dict(torch.load(
-        '/Users/bmassacci/main_folder/maastricht/academics/quantum_thesis/scripts/QES-Bianca'
-        '/QuantumEvolutionaryAlgorithms/QES_GAN/output' + f"/critic-510.pt"))  # Note: hardcoded
-    # for dev.
-
-    # loading the dataset
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))  # making sure the dir path is right
-    dataset = select_from_dataset(load_mnist(image_size=image_size), 1000, classes)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
-
-    avg_validities = []
-
-    for i, (real_images, _) in enumerate(dataloader):
-        real_images = real_images.to(device)
-        real_validity = critic_net(real_images)  # Real images.
-        avg_validity = float(torch.mean(real_validity))
-        avg_validities.append(avg_validity)
-        # If you want to plot:
-        # plot_image_tensor(torch.squeeze(real_images), 4, 8)
-
-    validity = mean(avg_validities)
-    print(f'Average validities across all images of all batches is: {validity}')
+from QuantumEvolutionaryAlgorithms.QES_GAN.networks.generator_methods import from_patches_to_image
 
 
-if __name__ == '__main__':
-    main()
+def scoring_function(batch_size, critic, qc,
+                     n_tot_qubits, n_ancillas, n_patches,
+                     pixels_per_patch, patch_width, patch_height, sim, device):
+    """
+    Calculates a score for a given quantum circuit based on a pre-trained critic network.
+    The function generates a batch of images using the specified quantum circuit and latent vectors.
+    It then passes these generated images through the critic network to obtain a score,
+    which represents the 'fitness' of the quantum circuit in generating images that resemble real images.
+    The function returns the average score for the whole the batch, providing an overall
+    evaluation of the quantum circuit.
+
+    :param batch_size: int. The number of images to generate and evaluate in one batch.
+    :param critic: torch.nn.Module. The pre-trained critic network used for evaluating the images.
+    :param qc: qiskit.circuit.quantumcircuit.QuantumCircuit. The quantum circuit to be executed.
+    :param n_tot_qubits: int. The total number of qubits used in the quantum circuit.
+    :param n_ancillas: int. The number of ancillary qubits in the quantum circuit.
+    :param n_patches: int. The number of patches into which each image is divided.
+    :param pixels_per_patch: int. The number of pixels in each patch of an image.
+    :param sim: StatevectorSimulator. The simulator used to run the quantum circuit.
+    :param patch_width: width (in pixels) of each patch.
+    :param patch_height: height (in pixels) of each patch.
+    :param device: the device (cpu or gpu) on which computations are to be performed.
+
+    :return: float. The average score for the generated batch of images, as evaluated by the critic.
+    """
+    generated_images = []
+    for batch_index in range(batch_size):
+        generated_image = from_patches_to_image(quantum_circuit=qc,
+                                                n_tot_qubits=n_tot_qubits,
+                                                n_ancillas=n_ancillas,
+                                                n_patches=n_patches,
+                                                pixels_per_patch=pixels_per_patch,
+                                                patch_width=patch_width,
+                                                patch_height=patch_height,
+                                                sim=sim)
+        generated_images.append(generated_image)
+
+    # Evaluate the generated images using the pre-trained critic network
+    # print(f'Device used in generator_fitness_function: {device}')
+    # critic.to(device) # redundant
+
+    generated_images_tensor = torch.stack(generated_images)
+    generated_images_tensor = generated_images_tensor.to(device)
+
+    fake_validity = critic(generated_images_tensor)
+
+    # Calculate the average score for this batch as the organism's score
+    average_score = float(torch.mean(fake_validity.detach()))
+
+    return average_score
