@@ -572,7 +572,8 @@ class Qes:
 
         filename_qasm = os.path.join(self.output_dir, f'final_best_ciruit.qasm')
 
-        metadata_filename = os.path.join(self.output_dir, "metadata.txt")
+        metadata_filename_txt = os.path.join(self.output_dir, "metadata.txt")
+        metadata_filename_csv = os.path.join(self.output_dir, "metadata.csv")
 
         # Write the data to the CSV file
         with open(filename_csv, mode='w', newline='') as file:
@@ -587,10 +588,17 @@ class Qes:
         print(f"Output saved to {filename_csv} and {filename_qasm}")
 
         # Write metadata to the file
-        with open(metadata_filename, "w") as f:
+        with open(metadata_filename_txt, "w") as f:
             for key, value in metadata.items():
                 f.write(f"{key} = {value}\n")
 
-        print(f"Metadata saved to {metadata_filename}")
+        # Save metadata to CSV file
+        with open(metadata_filename_csv, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Variable', 'Value'])  # Write header
+            for key, value in metadata.items():
+                writer.writerow([key, value])
+
+        print(f"Metadata saved to {metadata_filename_txt} and {metadata_filename_csv}")
 
         return self
