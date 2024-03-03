@@ -114,17 +114,6 @@ class Qes:
         self.n_generations = math.ceil(n_max_evaluations / n_children)
 
         #######################
-        # LOAD THE TARGET DATASET (needed to evaluate the circuit)
-        #######################
-
-        # # loading the dataset
-        # os.chdir(os.path.dirname(os.path.abspath(__file__)))  # setting path to dir of this file
-        # dataset = select_from_dataset(dataset=load_mnist(image_size=training_config.IMAGE_SIDE),
-        #                               per_class_size=1000,
-        #                               labels=training_config.CLASSES)
-        # self.dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
-
-        #######################
         # CREATE THE 0-TH INDIVIDUAL (QUANTUM CIRCUIT)
         #######################
 
@@ -555,6 +544,23 @@ class Qes:
         # Quantum circuit as qasm file
         qasm_best_end = algo.best_individuals[-1].qasm()
 
+        metadata = {
+            "N Data Qubits": self.n_data_qubits,
+            "N Ancilla": self.n_ancilla,
+            "Image Shape": (self.image_width, self.image_height),
+            "Batch Size": self.batch_size,
+            "N Children": self.n_children,
+            "Max Evaluations": self.n_max_evaluations,
+            "Shots": self.shots,
+            "Simulator": self.simulator,
+            "Noise": self.noise,
+            "DTheta": self.dtheta,
+            "Action Weights": self.action_weights,
+            "Multi Action Probability": self.multi_action_pb,
+            "Max Generations No Improvement": self.max_gen_no_improvement,
+            "Max Depth": self.max_depth
+        }
+
         # Look if the output directory exists, if not, create it
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -565,6 +571,9 @@ class Qes:
                                             f"{self.n_ancilla}.csv")
 
         filename_qasm = os.path.join(self.output_dir, f'final_best_ciruit.qasm')
+
+        metadata_filename_txt = os.path.join(self.output_dir, "metadata.txt")
+        metadata_filename_csv = os.path.join(self.output_dir, "metadata.csv")
 
         # Write the data to the CSV file
         with open(filename_csv, mode='w', newline='') as file:
@@ -578,5 +587,18 @@ class Qes:
 
         print(f"Output saved to {filename_csv} and {filename_qasm}")
 
-        # TODO: save also some random circuits, then run them on PQWGAN to see what you get
+        # Write metadata to the file
+        with open(metadata_filename_txt, "w") as f:
+            for key, value in metadata.items():
+                f.write(f"{key} = {value}\n")
+
+        # Save metadata to CSV file
+        with open(metadata_filename_csv, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Variable', 'Value'])  # Write header
+            for key, value in metadata.items():
+                writer.writerow([key, value])
+
+        print(f"Metadata saved to {metadata_filename_txt} and {metadata_filename_csv}")
+
         return self
