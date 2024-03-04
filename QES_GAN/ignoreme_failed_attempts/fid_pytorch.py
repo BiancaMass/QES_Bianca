@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 "This works but it is way too expensive, it wont do it. And it needs at least 2048 images per " \
-"batch to correctly comopute the covariance matrices."
+"batch to correctly compute the covariance matrices."
 
 import torch
 import numpy as np
