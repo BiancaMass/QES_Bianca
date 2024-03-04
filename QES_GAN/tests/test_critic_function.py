@@ -1,20 +1,26 @@
+"""
+Only for the CLASSICAL GENERATOR AND CRITIC from WGAN-GP.
+"""
+
 import os
 import torch
 from statistics import mean
 from torch.utils.data import DataLoader
 from QuantumEvolutionaryAlgorithms.QES_GAN.utils.dataset import load_mnist, select_from_dataset
-# from QuantumEvolutionaryAlgorithms.QES_GAN.networks.critic import ClassicalCritic
 from QuantumEvolutionaryAlgorithms.QES_GAN.networks.CGCC import ClassicalGAN
 from QuantumEvolutionaryAlgorithms.QES_GAN.utils.plotting import plot_image_tensor
 
 
-def main(critic_path, generator_path):
+def main(critic_path:str, generator_path:str):
     """
-    Loads the target image dataset (e.g., mnist digits) and feeds it to a
-    pre-trained critic network, printing the score given by the network. The purpose is to gauge
-    the ability of the pre-trained network to detect whether images are generated or real,
-    and to get a sense of what kind of score the critic is giving for images that are real. Of
-    course, score accuracy entirely depends on the critic (how well trained it is).
+    Loads a pre-trained critic and generator networks, and output critic scores for real images,
+    generated images, and random noise.
+    Only works for the classical generator and critic WGAN-GP at the moment.
+
+    :param critic_path: str. Path to the .pt file containing the pre-trained critic net.
+    :param generator_path: str.  Path to the .pt file containing the pre-trained generator net.
+
+    :returns: None.
     """
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -39,12 +45,7 @@ def main(critic_path, generator_path):
     critic_net = critic_net.to(device)
     generator_net = generator_net.to(device)
 
-    # critic_net = ClassicalGAN.ClassicalCritic(image_shape=(28, 28))
-    # # critic_net = ClassicalCritic(image_shape=(28, 28))
-    # critic_net = critic_net.to(device)
-    # critic_net.load_state_dict(torch.load(critic_path, map_location=device))
-
-    # loading the dataset
+    # Loading the dataset
     os.chdir(os.path.dirname(os.path.abspath(__file__)))  # making sure the dir path is right
     dataset = select_from_dataset(load_mnist(image_size=image_size), 1000, classes)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
@@ -71,7 +72,7 @@ def main(critic_path, generator_path):
         noise_validity = critic_net(noise)
         avg_validities_noise.append(float(torch.mean(noise_validity)))
 
-        # If you want to plot:
+        # If you want to plot tge images:
         # plot_image_tensor(torch.squeeze(real_images), 4, 8)
         # plot_image_tensor(generated_images.detach().numpy(), 4, 8)
         # plot_image_tensor(noise.detach().numpy(), 4, 8)
