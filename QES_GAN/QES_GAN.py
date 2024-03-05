@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import DataLoader
 from qiskit import QuantumCircuit, QuantumRegister, execute, Aer, IBMQ
 from qiskit.circuit.library import RYGate, RXGate, RZGate, RXXGate, RYYGate, RZZGate
+from qiskit.circuit.library import UGate, CXGate
 from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
@@ -206,10 +207,14 @@ class Qes:
 
             self.act_choice = random.choices(['A', 'D', 'S', 'M'], weights=self.action_weights,
                                              k=counter)  # outputs a list of k-number of actions
-            angle = random.random() * 2 * math.pi
-            gate_list = [qc.rx, qc.ry, qc.rz, qc.rxx, qc.ryy, qc.rzz]
-            gate_dict = {'rx': RXGate, 'ry': RYGate, 'rz': RZGate,
-                         'rxx': RXXGate, 'ryy': RYYGate, 'rzz': RZZGate}
+            angle1 = random.random() * 2 * math.pi
+            angle2 = random.random() * 2 * math.pi
+            angle3 = random.random() * 2 * math.pi
+            # gate_list = [qc.rx, qc.ry, qc.rz, qc.rxx, qc.ryy, qc.rzz]
+            # gate_dict = {'rx': RXGate, 'ry': RYGate, 'rz': RZGate,
+            #              'rxx': RXXGate, 'ryy': RYYGate, 'rzz': RZZGate}
+            gate_list = [qc.u, qc.cx]
+            gate_dict = {'UGate': UGate, 'CXGate': CXGate}
             position = 0
             print('action choice:', self.act_choice, 'for the copy number: ', i)
 
@@ -218,16 +223,17 @@ class Qes:
                 if self.act_choice[j] == 'A':
                     # print("ADDING action was selected \n")
                     # Chooses 2 locations for the destination qubit(s). Only one will be used for
-                    # rx, ry, rz, two will be used for rxx, ryy, rzz
+                    # U, 2 for CNOT
                     position = random.sample([i for i in range(len(qc.qubits))], k=2)
                     # Choose the type of gate (pick an index for the gates list)
                     choice = random.randint(0, len(gate_list) - 1)
-                    if 0 <= choice < 3:
+                    if choice == 0: # for the rotation gate
                         # print(f"Adding a {gate_list[choice]} gate at position: {position[0]}")
-                        gate_list[choice](angle, position[0])
+                        # u(theta, phi, lambda, qubit)
+                        gate_list[choice](angle1, angle2, angle3, position[0])
                     else:
                         # print(f"Adding a {gate_list[choice]} gate at positions: {position}")
-                        gate_list[choice](angle, position[0], position[1])
+                        gate_list[choice](position[0], position[1])
 
                     # print('Circuit after ADD ACTION:')
                     # print(qc)
@@ -244,7 +250,8 @@ class Qes:
 
                 # SWAP: Remove a random gate and replace it with a new gate randomly chosen
                 elif self.act_choice[j] == 'S':
-                    # print("SWAP action was selected \n")
+                    print("SWAP action was selected \n")
+                    # Control if there are enough gates in the circuit to perform a SWAP
                     if len(qc.data) - 1 - self.n_tot_qubits > 0:
                         # Pick a position for the gate to swap
                         # Exclude the the first n_tot_qubits gates (encoding gates)
@@ -256,15 +263,20 @@ class Qes:
                         remove_ok = False
 
                     if remove_ok:
-                        gate_to_remove = qc.data[position][0]
-                        gate_to_add = random.choice(list(gate_dict.values()))(angle)
+                        gate_to_remove = qc.data[position][0] # Get the gate to remove
+                        # Choose a new gate to add randomly from the gate dictionary
+                        gate_to_add = random.choice(list(gate_dict.values()))
                         # Avoid removing and adding the same gate
-                        while gate_to_add.name == gate_to_remove.name:
-                            gate_to_add = random.choice(list(gate_dict.values()))(angle)
-                        if gate_to_add.name == 'rzz' or gate_to_add.name == 'rxx' or gate_to_add.name == 'ryy':
+                        while gate_to_add.__name__ == gate_to_remove.name:
+                            gate_to_add = random.choice(list(gate_dict.values()))
+                        if gate_to_add.__name__ == 'CXGate':
                             n_qubits = 2
-                        else:
+                            gate_to_add = gate_to_add()
+                        elif gate_to_add.__name__ == 'UGate':
                             n_qubits = 1
+                            gate_to_add = gate_to_add(angle1, angle2, angle3)
+                        else:
+                            print('Error: swap gate not in gate list')
                         # number of qubits affected by the gate to be swapped
                         length = len(qc.data[position][1])
                         # if we are swapping gates with the same amount of qubits
@@ -297,18 +309,17 @@ class Qes:
                 # MUTATE: Choose a gate and change its angle by a value between [θ-d_θ, θ+d_θ]
                 elif self.act_choice[j] == 'M':
                     # print("MUTATE action was selected \n")
-                    to_not_select = 'h'
+                    to_select = 'u'
                     gates_to_mutate = [i for i, gate in enumerate(qc.data[self.n_tot_qubits:],
                                                                   start=self.n_tot_qubits)
-                                       if gate[0].name != to_not_select]
+                                       if gate[0].name == to_select]
 
                     if gates_to_mutate:
                         position = random.choice(gates_to_mutate)
                         gate_to_mutate = qc.data[position]
-
-                        angle_new = gate_to_mutate[0].params[0] + random.uniform(0, self.dtheta)
-                        mutated_gate = gate_dict[gate_to_mutate[0].name](angle_new)
-                        qc.data[position] = (mutated_gate, *gate_to_mutate[1:])
+                        angle_to_mutate = random.randint(0, 2)
+                        angle_new = gate_to_mutate[0].params[angle_to_mutate] + random.uniform(0, self.dtheta)
+                        gate_to_mutate[0].params[angle_to_mutate] = angle_new
 
                         # print(
                         #     f'Mutated gate {gate_to_mutate} into {(mutated_gate, *gate_to_mutate[1:])} at position {position}')

@@ -33,7 +33,7 @@ def main():
     critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
     critic_net = critic_net.to(device)
     current_working_directory = os.getcwd()
-    critic_net_path = current_working_directory + '/output/' + "critic_300_classic.pt" # Note: Hard coded
+    critic_net_path = current_working_directory + '/input/' + "critic_300_classic.pt"
     print(f'critic net path: {critic_net_path}')
     # Import pre-trained critic net
     critic_net.load_state_dict(torch.load(critic_net_path, map_location=device))
