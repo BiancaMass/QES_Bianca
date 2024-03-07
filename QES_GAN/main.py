@@ -22,12 +22,14 @@ def main():
     max_depth = training_config.MAX_DEPTH
 
     # device = torch.device("cpu")
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if torch.cuda.is_available():
         gpu = True
         print('GPU available')
     else:
         gpu = False
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f'\nUsing {device} as a device\n')
+
 
     print(f'Using device: {device}')
     critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
