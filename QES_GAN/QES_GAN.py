@@ -134,8 +134,8 @@ class Qes:
             qc_0.ry(self.latent_vector_0[i], i)
 
         # Hadamard gates
-        # for qbit in range(self.n_tot_qubits):
-        #     qc_0.h(qbit)
+        for qbit in range(self.n_tot_qubits):
+            qc_0.h(qbit)
         ### END 0-GEN CIRCUIT ###
 
         # CURRENT generation parameters
@@ -543,27 +543,54 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                index = np.argmin(self.fitnesses)  # index of the best (greatest) fitness
-                # value
-                if self.fitnesses[index] > self.best_fitness[g - 1]:
-                    print('improvement found')
-                    self.best_individuals.append(self.population[index])
-                    self.ind = self.population[index]
-                    self.depth.append(self.ind.depth())
-                    self.best_fitness.append(self.fitnesses[index])
-                    self.best_solution.append(self.candidate_sol[index])
-                    for i in range(self.counting_multi_action + 1):
-                        self.best_actions.append(self.act_choice[i])
+                if self.fitness_function == 'emd':
+                    index = np.argmin(self.fitnesses)  # index of the best (greatest) fitness
+                    # value
+                    if self.fitnesses[index] < self.best_fitness[g - 1]:
+                        print('improvement found')
+                        self.best_individuals.append(self.population[index])
+                        self.ind = self.population[index]
+                        self.depth.append(self.ind.depth())
+                        self.best_fitness.append(self.fitnesses[index])
+                        self.best_solution.append(self.candidate_sol[index])
+                        for i in range(self.counting_multi_action + 1):
+                            self.best_actions.append(self.act_choice[i])
 
-                    self.no_improvements = 0
+                        self.no_improvements = 0
+
+                    else:
+                        print('no improvements found')
+                        self.no_improvements += 1
+                        self.best_individuals.append(self.ind)
+                        self.depth.append(self.ind.depth())
+                        self.best_fitness.append(self.best_fitness[g - 1])
+                        self.best_solution.append(self.best_solution[g - 1])
+
+                elif self.fitness_function == 'critic':
+                    index = np.argmax(self.fitnesses)  # index of the best (greatest) fitness
+                    # value
+                    if self.fitnesses[index] > self.best_fitness[g - 1]:
+                        print('improvement found')
+                        self.best_individuals.append(self.population[index])
+                        self.ind = self.population[index]
+                        self.depth.append(self.ind.depth())
+                        self.best_fitness.append(self.fitnesses[index])
+                        self.best_solution.append(self.candidate_sol[index])
+                        for i in range(self.counting_multi_action + 1):
+                            self.best_actions.append(self.act_choice[i])
+
+                        self.no_improvements = 0
+
+                    else:
+                        print('no improvements found')
+                        self.no_improvements += 1
+                        self.best_individuals.append(self.ind)
+                        self.depth.append(self.ind.depth())
+                        self.best_fitness.append(self.best_fitness[g - 1])
+                        self.best_solution.append(self.best_solution[g - 1])
 
                 else:
-                    print('no improvements found')
-                    self.no_improvements += 1
-                    self.best_individuals.append(self.ind)
-                    self.depth.append(self.ind.depth())
-                    self.best_fitness.append(self.best_fitness[g - 1])
-                    self.best_solution.append(self.best_solution[g - 1])
+                    raise ValueError(f"Unknown fitness function: {self.fitness_function}")
 
                 # Save best image every 10 generations
                 if g % 10 == 0:
