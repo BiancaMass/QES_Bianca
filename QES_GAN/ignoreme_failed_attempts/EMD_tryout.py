@@ -44,6 +44,10 @@ def emd_test(generator_path:str):
     dataset = select_from_dataset(load_mnist(image_size=image_size), 1000, classes)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
 
+    distances_real_noise = []
+    distances_real_gen = []
+    distances_gen_noise = []
+
     for i, (real_images, _) in enumerate(dataloader):
         real_images = real_images.to(device)  # batch of 64
 
@@ -56,19 +60,39 @@ def emd_test(generator_path:str):
 
         # Flatten the tensors into 1D distributions
         generated_images_flat = generated_images.view(generated_images.size(0), -1)
+        real_images_flat = real_images.view(real_images.size(0), -1)
         noise_images_flat = noise.view(noise.size(0), -1)
 
         # Convert the tensors to numpy arrays
         generated_images_flat_np = generated_images_flat.cpu().detach().numpy()
+        real_images_flat_np = real_images_flat.cpu().detach().numpy()
         noise_images_flat_np = noise_images_flat.cpu().detach().numpy()
 
-        distance = scipy.stats.wasserstein_distance(generated_images_flat_np.flatten(),
-                                                    noise_images_flat_np.flatten())
+        distance_real_noise = scipy.stats.wasserstein_distance(real_images_flat_np.flatten(),
+                                                               noise_images_flat_np.flatten())
+        distances_real_noise.append(distance_real_noise)
 
-        print(f'Calculated EMD distance: {distance}')
+        distance_real_gen = scipy.stats.wasserstein_distance(real_images_flat_np.flatten(),
+                                                             generated_images_flat_np.flatten())
+        distances_real_gen.append(distance_real_gen)
+
+        distance_gen_noise = scipy.stats.wasserstein_distance(generated_images_flat_np.flatten(),
+                                                    noise_images_flat_np.flatten())
+        distances_gen_noise.append(distance_gen_noise)
+
         # If you want to plot tge images:
-        plot_image_tensor(generated_images.detach().numpy(), 4, 8)
-        plot_image_tensor(noise.detach().numpy(), 4, 8)
+        # plot_image_tensor(generated_images.detach().numpy(), 4, 8)
+        # plot_image_tensor(noise.detach().numpy(), 4, 8)
+
+    distance_real_noise_avg = mean(distances_real_noise)
+    distance_real_gen_avg = mean(distances_real_gen)
+    distance_gen_noise_avg = mean(distances_gen_noise)
+
+    print(f'Average EM-Distance b/w Real and Noise distribution: {distance_real_noise_avg}')
+    print(f'Average EM-Distance b/w Real and Gen distribution: {distance_real_gen_avg}')
+    print(f'Average EM-Distance b/w Gen and Noise distribution: {distance_gen_noise_avg}')
+
+
 
 
 if __name__ == '__main__':
