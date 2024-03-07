@@ -13,12 +13,15 @@ from QuantumEvolutionaryAlgorithms.QES_GAN.utils.plotting import plot_image_tens
 
 def emd_test(generator_path:str):
     """
-    Loads a pre-trained critic and generator networks, and output critic scores for real images,
-    generated images, and random noise.
-    Only works for the classical generator and critic WGAN-GP at the moment.
+    This function tests the performance of scipy's earth mover distance (EMD) function for my use
+    case. It calculates and prints the EMD for:
+    - real images from the MNIST dataset and noise images
+    - real images from the MNIST dataset and generated images by a quantum generator (pre-loaded from a .qasm file)
+    - generated images by the quantum circuit and noise images
+    - real images from the MNIST dataset and completely black images
+    - real images from the MNIST dataset and completely white images
 
-    :param critic_path: str. Path to the .pt file containing the pre-trained critic net.
-    :param generator_path: str.  Path to the .pt file containing the pre-trained generator net.
+    :param generator_path: str.  Path to the .qasm file containing the pre-trained generator net.
 
     :returns: None.
     """
@@ -44,9 +47,15 @@ def emd_test(generator_path:str):
     dataset = select_from_dataset(load_mnist(image_size=image_size), 1000, classes)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1)
 
+    # Full black and full white images
+    black_image = torch.zeros(1, 28, 28, device=device)
+    white_image = torch.ones(1, 28, 28, device=device) * 255
+
     distances_real_noise = []
     distances_real_gen = []
     distances_gen_noise = []
+    distances_real_black = []
+    distances_real_white = []
 
     for i, (real_images, _) in enumerate(dataloader):
         real_images = real_images.to(device)  # batch of 64
@@ -58,6 +67,10 @@ def emd_test(generator_path:str):
         # Random noise
         noise = torch.randn(len(real_images), 28, 28, device=device)
 
+        # Full black and full white
+        black_images_flat = black_image.view(black_image.size(0), -1).repeat(real_images.size(0), 1)
+        white_images_flat = white_image.view(white_image.size(0), -1).repeat(real_images.size(0), 1)
+
         # Flatten the tensors into 1D distributions
         generated_images_flat = generated_images.view(generated_images.size(0), -1)
         real_images_flat = real_images.view(real_images.size(0), -1)
@@ -67,6 +80,8 @@ def emd_test(generator_path:str):
         generated_images_flat_np = generated_images_flat.cpu().detach().numpy()
         real_images_flat_np = real_images_flat.cpu().detach().numpy()
         noise_images_flat_np = noise_images_flat.cpu().detach().numpy()
+        black_images_flat_np = black_images_flat.cpu().detach().numpy()
+        white_images_flat_np = white_images_flat.cpu().detach().numpy()
 
         distance_real_noise = scipy.stats.wasserstein_distance(real_images_flat_np.flatten(),
                                                                noise_images_flat_np.flatten())
@@ -80,6 +95,14 @@ def emd_test(generator_path:str):
                                                     noise_images_flat_np.flatten())
         distances_gen_noise.append(distance_gen_noise)
 
+        distance_real_black = scipy.stats.wasserstein_distance(real_images_flat_np.flatten(),
+                                                               black_images_flat_np.flatten())
+        distances_real_black.append(distance_real_black)
+
+        distance_real_white = scipy.stats.wasserstein_distance(real_images_flat_np.flatten(),
+                                                               white_images_flat_np.flatten())
+        distances_real_white.append(distance_real_white)
+
         # If you want to plot tge images:
         # plot_image_tensor(generated_images.detach().numpy(), 4, 8)
         # plot_image_tensor(noise.detach().numpy(), 4, 8)
@@ -87,12 +110,14 @@ def emd_test(generator_path:str):
     distance_real_noise_avg = mean(distances_real_noise)
     distance_real_gen_avg = mean(distances_real_gen)
     distance_gen_noise_avg = mean(distances_gen_noise)
+    distance_real_black_avg = mean(distances_real_black)
+    distance_real_white_avg = mean(distances_real_white)
 
     print(f'Average EM-Distance b/w Real and Noise distribution: {distance_real_noise_avg}')
     print(f'Average EM-Distance b/w Real and Gen distribution: {distance_real_gen_avg}')
     print(f'Average EM-Distance b/w Gen and Noise distribution: {distance_gen_noise_avg}')
-
-
+    print(f'Average EM-Distance b/w Real and Full Black distribution: {distance_real_black_avg}')
+    print(f'Average EM-Distance b/w Real and Full White distribution: {distance_real_white_avg}')
 
 
 if __name__ == '__main__':
