@@ -129,8 +129,8 @@ class Qes:
         for i in range(self.n_tot_qubits):
             qc_0.ry(self.latent_vector_0[i], i)
 
-        for qbit in range(self.n_tot_qubits):
-            qc_0.h(qbit)
+        # for qbit in range(self.n_tot_qubits):
+        #     qc_0.h(qbit)
         ### END 0-GEN CIRCUIT ###
 
         # CURRENT generation parameters
@@ -243,8 +243,11 @@ class Qes:
                     # print("DELETE action was selected")
                     # Pick a position for the gate to remove.
                     # Exclude the the first n_tot_qubits gates (encoding gates)
-                    position = random.randint(self.n_tot_qubits, len(qc.data) - 1)
-                    qc.data.remove(qc.data[position])
+                    if self.n_tot_qubits < len(qc.data) - 1:
+                        position = random.randint(self.n_tot_qubits, len(qc.data) - 1)
+                        qc.data.remove(qc.data[position])
+                    else:
+                        pass
                     # print("Circuit after DELETE action")
                     # print(qc)
 
