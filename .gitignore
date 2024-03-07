@@ -2,6 +2,7 @@ QES_GAN/datasets
 QES_GAN/output
 QES_GAN/input
 QES_GAN/tests/datasets
+QES_GAN/utils/datasets
 QES_GAN/ignoreme_failed_attempts/datasets
 __pycache__/
 ../QES/trackhhl/event_model/__pycache__/event_model.cpython-310.pyc
