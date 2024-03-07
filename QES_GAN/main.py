@@ -10,6 +10,7 @@ def main():
     n_ancilla = training_config.N_ANCILLAS
     image_shape = (training_config.IMAGE_SIDE, training_config.IMAGE_SIDE)
     batch_size = training_config.BATCH_SIZE
+    fitness_function = training_config.FITNESS_FUNCTION
     n_children = training_config.N_CHILDREN
     n_max_evaluations = training_config.M_MAX_EVALUATIONS
     shots = training_config.SHOTS
@@ -48,6 +49,7 @@ def main():
                   classes=classes,
                   critic_net=critic_net,
                   n_children=n_children,
+                  fitness_function=fitness_function,
                   n_max_evaluations=n_max_evaluations,
                   shots=shots,
                   simulator=simulator,
