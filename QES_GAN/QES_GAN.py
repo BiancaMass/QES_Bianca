@@ -30,7 +30,7 @@ class Qes:
 
     def __init__(self, n_data_qubits, n_ancilla, image_shape,
                  batch_size, classes, critic_net,
-                 n_children, n_max_evaluations,
+                 n_children, fitness_function, n_max_evaluations,
                  shots, simulator, noise, gpu, device,
                  dtheta, action_weights, multi_action_pb,
                  max_gen_no_improvement,
@@ -89,6 +89,7 @@ class Qes:
         self.classes = classes
         self.critic_net = critic_net
 
+        self.fitness_function = fitness_function
         self.n_children = n_children
         self.n_max_evaluations = n_max_evaluations
         self.shots = shots
@@ -132,6 +133,7 @@ class Qes:
         for i in range(self.n_tot_qubits):
             qc_0.ry(self.latent_vector_0[i], i)
 
+        # Hadamard gates
         # for qbit in range(self.n_tot_qubits):
         #     qc_0.h(qbit)
         ### END 0-GEN CIRCUIT ###
@@ -416,37 +418,38 @@ class Qes:
         # Create an empty list to store calculated fitness values
         self.fitnesses = []
 
-        # for i, (real_images, _) in enumerate(self.dataloader):
-        #     real_images = real_images.to(self.device)
-
         # if there are more candidates than chosen number of children
         # Question: why?
         if len(self.candidate_sol) > self.n_children:
             selected_batch = random.choice(self.cached_real_images_batches)
-            self.best_fitness[-1] = emd_scoring_function(real_images_preloaded=selected_batch,
-                                                         batch_size=self.batch_size,
-                                                         qc=self.population[0],
-                                                         # img_size=self.image_width,
-                                                         # classes=[0,1],  # todo: hard coded
-                                                         n_tot_qubits=self.n_tot_qubits,
-                                                         n_ancillas=self.n_ancilla,
-                                                         n_patches=self.n_patches,
-                                                         pixels_per_patch=self.pixels_per_patch,
-                                                         patch_width=self.patch_width,
-                                                         patch_height=self.patch_height,
-                                                         sim=self.sim,
-                                                         device=self.device)
-            # self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
-            #                                          critic=self.critic_net,
-            #                                          qc=self.population[0],
-            #                                          n_tot_qubits=self.n_tot_qubits,
-            #                                          n_ancillas=self.n_ancilla,
-            #                                          n_patches=self.n_patches,
-            #                                          pixels_per_patch=self.pixels_per_patch,
-            #                                          patch_width=self.patch_width,
-            #                                          patch_height=self.patch_height,
-            #                                          sim=self.sim,
-            #                                          device=self.device)
+            try:
+                if self.fitness_function == 'emd':
+                    self.best_fitness[-1] = emd_scoring_function(real_images_preloaded=selected_batch,
+                                                                 batch_size=self.batch_size,
+                                                                 qc=self.population[0],
+                                                                 n_tot_qubits=self.n_tot_qubits,
+                                                                 n_ancillas=self.n_ancilla,
+                                                                 n_patches=self.n_patches,
+                                                                 pixels_per_patch=self.pixels_per_patch,
+                                                                 patch_width=self.patch_width,
+                                                                 patch_height=self.patch_height,
+                                                                 sim=self.sim)
+                elif self.fitness_function == 'critic':
+                    self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
+                                                             critic=self.critic_net,
+                                                             qc=self.population[0],
+                                                             n_tot_qubits=self.n_tot_qubits,
+                                                             n_ancillas=self.n_ancilla,
+                                                             n_patches=self.n_patches,
+                                                             pixels_per_patch=self.pixels_per_patch,
+                                                             patch_width=self.patch_width,
+                                                             patch_height=self.patch_height,
+                                                             sim=self.sim,
+                                                             device=self.device)
+                else:
+                    raise ValueError('Unsupported fitness function specified. Please select either "emd" or "critic".')
+            except Exception as e:
+                print(f"An error occurred during fitness function evaluation: {e}")
 
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
@@ -454,30 +457,36 @@ class Qes:
 
         for i in range(len(self.candidate_sol)):  # should this be population instead?
             selected_batch = random.choice(self.cached_real_images_batches)
-            self.fitnesses.append(emd_scoring_function(real_images_preloaded=selected_batch,
-                                                       batch_size=self.batch_size,
-                                                         qc=self.population[0],
-                                                         # img_size=self.image_width,
-                                                         # classes=[0, 1], # todo: hard coded
-                                                         n_tot_qubits=self.n_tot_qubits,
-                                                         n_ancillas=self.n_ancilla,
-                                                         n_patches=self.n_patches,
-                                                         pixels_per_patch=self.pixels_per_patch,
-                                                         patch_width=self.patch_width,
-                                                         patch_height=self.patch_height,
-                                                         sim=self.sim,
-                                                         device=self.device))
-            # self.fitnesses.append(scoring_function(batch_size=self.batch_size,
-            #                                        critic=self.critic_net,
-            #                                        qc=self.population[i],
-            #                                        n_tot_qubits=self.n_tot_qubits,
-            #                                        n_ancillas=self.n_ancilla,
-            #                                        n_patches=self.n_patches,
-            #                                        pixels_per_patch=self.pixels_per_patch,
-            #                                        patch_width=self.patch_width,
-            #                                        patch_height=self.patch_height,
-            #                                        sim=self.sim,
-            #                                        device=self.device))
+            try:
+                if self.fitness_function == 'emd':
+                    self.fitnesses.append(emd_scoring_function(real_images_preloaded=selected_batch,
+                                                               batch_size=self.batch_size,
+                                                                 qc=self.population[0],
+                                                                 n_tot_qubits=self.n_tot_qubits,
+                                                                 n_ancillas=self.n_ancilla,
+                                                                 n_patches=self.n_patches,
+                                                                 pixels_per_patch=self.pixels_per_patch,
+                                                                 patch_width=self.patch_width,
+                                                                 patch_height=self.patch_height,
+                                                                 sim=self.sim))
+                elif self.fitness_function == 'critic':
+                    self.fitnesses.append(scoring_function(batch_size=self.batch_size,
+                                                           critic=self.critic_net,
+                                                           qc=self.population[i],
+                                                           n_tot_qubits=self.n_tot_qubits,
+                                                           n_ancillas=self.n_ancilla,
+                                                           n_patches=self.n_patches,
+                                                           pixels_per_patch=self.pixels_per_patch,
+                                                           patch_width=self.patch_width,
+                                                           patch_height=self.patch_height,
+                                                           sim=self.sim,
+                                                           device=self.device))
+                else:
+                    raise ValueError('Unsupported fitness function specified. Please select '
+                                     'either "emd" or "critic".')
+            except Exception as e:
+                print(f"An error occurred during fitness function evaluation: {e}")
+
             self.fitness_evaluations += 1
         print(f'fitnesses: {self.fitnesses}')
 
@@ -534,7 +543,8 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                index = np.argmax(self.fitnesses)  # index of the best (greatest) fitness value
+                index = np.argmin(self.fitnesses)  # index of the best (greatest) fitness
+                # value
                 if self.fitnesses[index] > self.best_fitness[g - 1]:
                     print('improvement found')
                     self.best_individuals.append(self.population[index])
@@ -556,7 +566,7 @@ class Qes:
                     self.best_solution.append(self.best_solution[g - 1])
 
                 # Save best image every 10 generations
-                if g % 40 == 0:
+                if g % 10 == 0:
                     image_filename = os.path.join(self.output_dir, f"best_solution_{g}.png")
                     save_tensor(tensor=self.best_solution[-1].squeeze(),
                                 filename=image_filename)
