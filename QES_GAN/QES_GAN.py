@@ -15,6 +15,7 @@ from decimal import Decimal, getcontext
 
 from networks.generator_methods import from_patches_to_image
 from utils.critic_based_fitness_function import scoring_function
+from utils.emd_cost_function import emd_scoring_function
 from utils.dataset import select_from_dataset, load_mnist
 from utils.plotting import save_tensor
 from configs import training_config
@@ -28,7 +29,7 @@ class Qes:
     """
 
     def __init__(self, n_data_qubits, n_ancilla, image_shape,
-                 batch_size, critic_net,
+                 batch_size, classes, critic_net,
                  n_children, n_max_evaluations,
                  shots, simulator, noise, gpu, device,
                  dtheta, action_weights, multi_action_pb,
@@ -41,6 +42,7 @@ class Qes:
         :param image_shape: tuple. weight and height of the image.
         :param batch_size: int. Batch size to evaluate a qc (how many times to call it for the
         fitness)
+        :param classes: list. The classes of images for the dataset e.g., [0,1] for mnist
         :param n_children: integer. Number of children for each generation.
         :param n_max_evaluations: integer. Maximum number of times a new generated ansatz is
         evaluated.
@@ -84,6 +86,7 @@ class Qes:
                              f"Individual patch height: {self.patch_height} \n")
 
         self.batch_size = batch_size
+        self.classes = classes
         self.critic_net = critic_net
 
         self.n_children = n_children
@@ -174,6 +177,9 @@ class Qes:
         # All the algorithm data we need to store
         self.output = None
 
+        # Preload images from the real dataset to use to calculate the EMD (earth mover distance)
+        self.cached_real_images_batches = self.preload_real_images_batches(n_batches=10)
+
         # Set output directory path
         self.output_dir = os.path.join("output", datetime.now().strftime("%y_%m_%d_%H_%M_%S"))
         if not os.path.exists(self.output_dir):
@@ -182,6 +188,18 @@ class Qes:
             print(f"Output directory created: {self.output_dir}")
 
         print('Initial quantum circuit: \n', self.ind)
+
+
+    def preload_real_images_batches(self, n_batches=10):
+        print("Pre-loading real image batches")
+        dataset = select_from_dataset(load_mnist(image_size=self.image_width), 1000, self.classes)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=1)
+        real_images_batches = []
+        for i, (real_images, _) in enumerate(dataloader):
+            real_images_batches.append(real_images.to(self.device))
+            if i + 1 == n_batches:  # Stop after preloading n_batches
+                break
+        return real_images_batches
 
     def action(self):
         """ It generates n_children of the individual and apply one of the 4 POSSIBLE ACTIONS(add,
@@ -404,34 +422,62 @@ class Qes:
         # if there are more candidates than chosen number of children
         # Question: why?
         if len(self.candidate_sol) > self.n_children:
-            self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
-                                                     critic=self.critic_net,
-                                                     qc=self.population[0],
-                                                     n_tot_qubits=self.n_tot_qubits,
-                                                     n_ancillas=self.n_ancilla,
-                                                     n_patches=self.n_patches,
-                                                     pixels_per_patch=self.pixels_per_patch,
-                                                     patch_width=self.patch_width,
-                                                     patch_height=self.patch_height,
-                                                     sim=self.sim,
-                                                     device=self.device)
+            selected_batch = random.choice(self.cached_real_images_batches)
+            self.best_fitness[-1] = emd_scoring_function(real_images_preloaded=selected_batch,
+                                                         batch_size=self.batch_size,
+                                                         qc=self.population[0],
+                                                         # img_size=self.image_width,
+                                                         # classes=[0,1],  # todo: hard coded
+                                                         n_tot_qubits=self.n_tot_qubits,
+                                                         n_ancillas=self.n_ancilla,
+                                                         n_patches=self.n_patches,
+                                                         pixels_per_patch=self.pixels_per_patch,
+                                                         patch_width=self.patch_width,
+                                                         patch_height=self.patch_height,
+                                                         sim=self.sim,
+                                                         device=self.device)
+            # self.best_fitness[-1] = scoring_function(batch_size=self.batch_size,
+            #                                          critic=self.critic_net,
+            #                                          qc=self.population[0],
+            #                                          n_tot_qubits=self.n_tot_qubits,
+            #                                          n_ancillas=self.n_ancilla,
+            #                                          n_patches=self.n_patches,
+            #                                          pixels_per_patch=self.pixels_per_patch,
+            #                                          patch_width=self.patch_width,
+            #                                          patch_height=self.patch_height,
+            #                                          sim=self.sim,
+            #                                          device=self.device)
 
             self.fitness_evaluations += 1
             del self.candidate_sol[0]
             del self.population[0]
 
         for i in range(len(self.candidate_sol)):  # should this be population instead?
-            self.fitnesses.append(scoring_function(batch_size=self.batch_size,
-                                                   critic=self.critic_net,
-                                                   qc=self.population[i],
-                                                   n_tot_qubits=self.n_tot_qubits,
-                                                   n_ancillas=self.n_ancilla,
-                                                   n_patches=self.n_patches,
-                                                   pixels_per_patch=self.pixels_per_patch,
-                                                   patch_width=self.patch_width,
-                                                   patch_height=self.patch_height,
-                                                   sim=self.sim,
-                                                   device=self.device))
+            selected_batch = random.choice(self.cached_real_images_batches)
+            self.fitnesses.append(emd_scoring_function(real_images_preloaded=selected_batch,
+                                                       batch_size=self.batch_size,
+                                                         qc=self.population[0],
+                                                         # img_size=self.image_width,
+                                                         # classes=[0, 1], # todo: hard coded
+                                                         n_tot_qubits=self.n_tot_qubits,
+                                                         n_ancillas=self.n_ancilla,
+                                                         n_patches=self.n_patches,
+                                                         pixels_per_patch=self.pixels_per_patch,
+                                                         patch_width=self.patch_width,
+                                                         patch_height=self.patch_height,
+                                                         sim=self.sim,
+                                                         device=self.device))
+            # self.fitnesses.append(scoring_function(batch_size=self.batch_size,
+            #                                        critic=self.critic_net,
+            #                                        qc=self.population[i],
+            #                                        n_tot_qubits=self.n_tot_qubits,
+            #                                        n_ancillas=self.n_ancilla,
+            #                                        n_patches=self.n_patches,
+            #                                        pixels_per_patch=self.pixels_per_patch,
+            #                                        patch_width=self.patch_width,
+            #                                        patch_height=self.patch_height,
+            #                                        sim=self.sim,
+            #                                        device=self.device))
             self.fitness_evaluations += 1
         print(f'fitnesses: {self.fitnesses}')
 

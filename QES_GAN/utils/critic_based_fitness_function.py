@@ -41,9 +41,6 @@ def scoring_function(batch_size, critic, qc,
                                                 sim=sim)
         generated_images.append(generated_image)
 
-    # Evaluate the generated images using the pre-trained critic network
-    # print(f'Device used in generator_fitness_function: {device}')
-    # critic.to(device) # redundant
 
     generated_images_tensor = torch.stack(generated_images)
     generated_images_tensor = generated_images_tensor.to(device)

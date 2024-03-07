@@ -20,6 +20,7 @@ def main():
     multi_action_pb = training_config.MULTI_ACTION_PB
     max_gen_no_improvements = training_config.MAX_GEN_NO_IMPROVEMENT
     max_depth = training_config.MAX_DEPTH
+    classes = training_config.CLASSES
 
     # device = torch.device("cpu")
     if torch.cuda.is_available():
@@ -44,6 +45,7 @@ def main():
                   n_ancilla=n_ancilla,
                   image_shape=image_shape,
                   batch_size=batch_size,
+                  classes=classes,
                   critic_net=critic_net,
                   n_children=n_children,
                   n_max_evaluations=n_max_evaluations,

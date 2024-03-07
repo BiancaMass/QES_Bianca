@@ -11,7 +11,7 @@ OUTPUT_DIR = os.path.join(f"./output/{ARCHITECTURE_NAME}/{STRING_TIME}")
 #####################
 ## GAN PARAMETERS ##
 #####################
-BATCH_SIZE = 32
+BATCH_SIZE = 128  # keep high cause distance is calculated on only 1 batch
 LR_G = 0.01  # learning rate for the generator
 # Betas, initial decay rate for the Adam optimizer
 # Check: if these values are appropriate
@@ -48,8 +48,8 @@ N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2
 ## EVOLUTIONARY PARAMETERS ##
 #############################
 
-N_CHILDREN = 30
-M_MAX_EVALUATIONS = 10000
+N_CHILDREN = 20
+M_MAX_EVALUATIONS = 800
 SHOTS = 5000  # maybe 10000-20000 better for 11 qubits
 SIMULATOR = 'statevector'
 NOISE = False
