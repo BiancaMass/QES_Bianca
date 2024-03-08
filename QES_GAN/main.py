@@ -43,24 +43,24 @@ def main():
     critic_net.load_state_dict(torch.load(critic_net_path, map_location=device))
 
     qes = qes_gan.Qes(n_data_qubits=n_data_qubits,
-                  n_ancilla=n_ancilla,
-                  image_shape=image_shape,
-                  batch_size=batch_size,
-                  classes=classes,
-                  critic_net=critic_net,
-                  n_children=n_children,
-                  fitness_function=fitness_function,
-                  n_max_evaluations=n_max_evaluations,
-                  shots=shots,
-                  simulator=simulator,
-                  noise=noise,
-                  gpu=gpu,
-                  device=device,
-                  dtheta=dtheta,
-                  action_weights=action_weights,
-                  multi_action_pb=multi_action_pb,
-                  max_gen_no_improvement=max_gen_no_improvements,
-                  max_depth=max_depth)
+                      n_ancilla=n_ancilla,
+                      image_shape=image_shape,
+                      batch_size=batch_size,
+                      classes=classes,
+                      critic_net=critic_net,
+                      n_children=n_children,
+                      fitness_function=fitness_function,
+                      n_max_evaluations=n_max_evaluations,
+                      shots=shots,
+                      simulator=simulator,
+                      noise=noise,
+                      gpu=gpu,
+                      device=device,
+                      dtheta=dtheta,
+                      action_weights=action_weights,
+                      multi_action_pb=multi_action_pb,
+                      max_gen_no_improvement=max_gen_no_improvements,
+                      max_depth=max_depth)
 
     qes.data()
 
