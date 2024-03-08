@@ -455,20 +455,20 @@ class Qes:
             del self.candidate_sol[0]
             del self.population[0]
 
-        for i in range(len(self.candidate_sol)):  # should this be population instead?
+        for i in range(len(self.candidate_sol)):
             selected_batch = random.choice(self.cached_real_images_batches)
             try:
                 if self.fitness_function == 'emd':
                     self.fitnesses.append(emd_scoring_function(real_images_preloaded=selected_batch,
                                                                batch_size=self.batch_size,
-                                                                 qc=self.population[0],
-                                                                 n_tot_qubits=self.n_tot_qubits,
-                                                                 n_ancillas=self.n_ancilla,
-                                                                 n_patches=self.n_patches,
-                                                                 pixels_per_patch=self.pixels_per_patch,
-                                                                 patch_width=self.patch_width,
-                                                                 patch_height=self.patch_height,
-                                                                 sim=self.sim))
+                                                               qc=self.population[i],
+                                                               n_tot_qubits=self.n_tot_qubits,
+                                                               n_ancillas=self.n_ancilla,
+                                                               n_patches=self.n_patches,
+                                                               pixels_per_patch=self.pixels_per_patch,
+                                                               patch_width=self.patch_width,
+                                                               patch_height=self.patch_height,
+                                                               sim=self.sim))
                 elif self.fitness_function == 'critic':
                     self.fitnesses.append(scoring_function(batch_size=self.batch_size,
                                                            critic=self.critic_net,
@@ -543,9 +543,9 @@ class Qes:
                 # perform action on parent_ansatz, and then calculate fitness
                 self.action().encode().fitness
 
-                if self.fitness_function == 'emd':
-                    index = np.argmin(self.fitnesses)  # index of the best (greatest) fitness
-                    # value
+                if self.fitness_function == 'emd':  # with emd goal is to minimize
+                    index = np.argmin(self.fitnesses)  # index of the best (smallest) fitness value
+                    # self.fitnesses is the list of fitness values for the current generation
                     if self.fitnesses[index] < self.best_fitness[g - 1]:
                         print('improvement found')
                         self.best_individuals.append(self.population[index])
@@ -566,9 +566,9 @@ class Qes:
                         self.best_fitness.append(self.best_fitness[g - 1])
                         self.best_solution.append(self.best_solution[g - 1])
 
-                elif self.fitness_function == 'critic':
-                    index = np.argmax(self.fitnesses)  # index of the best (greatest) fitness
-                    # value
+                elif self.fitness_function == 'critic': # with critic goal is to maximize
+                    index = np.argmax(self.fitnesses)  # index of the best (greatest) fitness value
+                    # self.fitnesses is the list of fitness values for the current generation
                     if self.fitnesses[index] > self.best_fitness[g - 1]:
                         print('improvement found')
                         self.best_individuals.append(self.population[index])
