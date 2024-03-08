@@ -667,7 +667,7 @@ class Qes:
                                             f"{self.n_patches}_{self.n_tot_qubits}_"
                                             f"{self.n_ancilla}.csv")
 
-        filename_qasm = os.path.join(self.output_dir, f'final_best_ciruit.qasm')
+        filename_qasm = os.path.join(self.output_dir, f'final_best_circuit.qasm')
 
         metadata_filename_txt = os.path.join(self.output_dir, "metadata.txt")
         metadata_filename_csv = os.path.join(self.output_dir, "metadata.csv")
