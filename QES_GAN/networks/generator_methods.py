@@ -83,7 +83,7 @@ def from_patches_to_image(quantum_circuit, n_tot_qubits, n_ancillas, n_patches, 
                                              sim=sim)
         current_patch = current_patch[:pixels_per_patch]
         current_patch = torch.reshape(torch.from_numpy(current_patch),
-                                      (1, patch_width, patch_height))
+                                      (1, patch_height, patch_width))
         # Check: might be hard coded
         if n_patches == 1:
             final_image = current_patch

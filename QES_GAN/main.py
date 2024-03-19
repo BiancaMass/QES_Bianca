@@ -8,9 +8,11 @@ import configs.training_config as training_config
 def main():
     n_data_qubits = training_config.N_DATA_QUBITS
     n_ancilla = training_config.N_ANCILLAS
-    image_shape = (training_config.IMAGE_SIDE, training_config.IMAGE_SIDE)
+    patch_shape = (training_config.PATCH_WIDTH, training_config.PATCH_HEIGHT)
+    n_pixels_patch = training_config.PIXELS_PER_PATCH
     batch_size = training_config.BATCH_SIZE
     fitness_function = training_config.FITNESS_FUNCTION
+    n_patches = training_config.N_PATCHES
     n_children = training_config.N_CHILDREN
     n_max_evaluations = training_config.M_MAX_EVALUATIONS
     shots = training_config.SHOTS
@@ -44,12 +46,14 @@ def main():
 
     qes = qes_gan.Qes(n_data_qubits=n_data_qubits,
                       n_ancilla=n_ancilla,
-                      image_shape=image_shape,
+                      patch_shape=patch_shape,
+                      pixels_per_patch=n_pixels_patch,
                       batch_size=batch_size,
                       classes=classes,
                       critic_net=critic_net,
                       n_children=n_children,
                       fitness_function=fitness_function,
+                      n_patches=n_patches,
                       n_max_evaluations=n_max_evaluations,
                       shots=shots,
                       simulator=simulator,

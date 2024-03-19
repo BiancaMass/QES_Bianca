@@ -25,24 +25,19 @@ LAMBDA_GP = 10  # Coefficient for the gradient penalty
 
 IMAGE_SIDE = 28
 CLASSES = [0, 1]  # This only works for MNIST, picks number classes as specified in list
-# Note: for development phase, I assume square images
+# Note: I assume square images
 N_PIXELS = IMAGE_SIDE ** 2
 
 ########################
 ## CIRCUIT PARAMETERS ##
 ########################
-# Note: assuming patches are rows
-# N_PATCHES = IMAGE_SIDE
-# Note: if instead each image is generated at once:
-N_PATCHES = 1
+N_PATCHES = 28
 PIXELS_PER_PATCH = int(N_PIXELS / N_PATCHES)
-PATCH_WIDTH = int(IMAGE_SIDE)  # Note: executive decision that each patch is a row or multiple few
-# rows
+PATCH_WIDTH = int(IMAGE_SIDE)  # Note: executive decision that each patch is as long as the image
 PATCH_HEIGHT = int((N_PIXELS / N_PATCHES) / PATCH_WIDTH)
 N_ANCILLAS = 1
-# Data qubit determined by the number of qubits required to generate as many pixels as needed per
-# one patch
-N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2))
+# Data qubit = number of qubits required to generate as many pixels as needed per one patch
+N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2))  # per patch
 
 #############################
 ## EVOLUTIONARY PARAMETERS ##
@@ -51,7 +46,7 @@ N_DATA_QUBITS = math.ceil(math.log(int((IMAGE_SIDE * IMAGE_SIDE) / N_PATCHES), 2
 # FITNESS_FUNCTION = 'critic'
 FITNESS_FUNCTION = 'emd'
 N_CHILDREN = 10
-M_MAX_EVALUATIONS = 800
+M_MAX_EVALUATIONS = 400
 SHOTS = 5000  # maybe 10000-20000 better for 11 qubits
 SIMULATOR = 'statevector'
 NOISE = False

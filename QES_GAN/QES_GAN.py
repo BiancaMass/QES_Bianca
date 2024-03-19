@@ -13,7 +13,7 @@ from qiskit_aer import AerSimulator
 from qiskit.providers.fake_provider import FakeMumbaiV2
 from decimal import Decimal, getcontext
 
-from networks.generator_methods import from_patches_to_image
+from networks.generator_methods import from_patches_to_image, from_probs_to_pixels
 from utils.critic_based_fitness_function import scoring_function
 from utils.emd_cost_function import emd_scoring_function
 from utils.dataset import select_from_dataset, load_mnist
@@ -22,15 +22,18 @@ from configs import training_config
 
 # np.random.seed(123)  # for replicability
 
+# TODO: for now hard coded to only consider the first patch.
+# might consider later to include either different patches at random, to avoid overfitting and
+# finding a structure for a specific part of the image.
 
 class Qes:
     """
     Hybrid quantum-classical optimization technique
     """
 
-    def __init__(self, n_data_qubits, n_ancilla, image_shape,
+    def __init__(self, n_data_qubits, n_ancilla, patch_shape, pixels_per_patch,
                  batch_size, classes, critic_net,
-                 n_children, fitness_function, n_max_evaluations,
+                 n_children, fitness_function, n_patches, n_max_evaluations,
                  shots, simulator, noise, gpu, device,
                  dtheta, action_weights, multi_action_pb,
                  max_gen_no_improvement,
@@ -39,11 +42,15 @@ class Qes:
         """ Initialization of the population and its settings
         :param n_data_qubits: integer. Number of data qubits for the circuit.
         :param n_ancilla: integer. Number of ancilla qubits for the circuit.
-        :param image_shape: tuple. weight and height of the image.
+        :param patch_shape: tuple. weight and height of the image.
         :param batch_size: int. Batch size to evaluate a qc (how many times to call it for the
         fitness)
         :param classes: list. The classes of images for the dataset e.g., [0,1] for mnist
+        :param critic_net: pre-trained critic (classical).
         :param n_children: integer. Number of children for each generation.
+        :param fitness_function: str. What function to use for fitness, either 'emd' or 'critic'.
+        :param n_patches: number of patches that the 28x28 image is divided into. The
+        evolutionary algorithm then generates the ansatz for only one patch.
         :param n_max_evaluations: integer. Maximum number of times a new generated ansatz is
         evaluated.
         :param shots: integer. Number of executions on the circuit to get the prob. distribution.
@@ -59,31 +66,32 @@ class Qes:
         :param max_gen_no_improvement: integer. Number of generations with no improvements after which some changes will be applied
         :keyword max_depth: integer. It fixes an upper bound on the quantum circuits depth.
         """
+        # Error handling
+        if n_patches > 1 and fitness_function != 'emd':
+            raise ValueError(
+                "If patches are used (n_patches > 1), the fitness function must be 'emd'.")
+
+        # If all parameters are compatible, initialize the algorithm
         print("Initializing Qes instance")
         self.n_data_qubits = n_data_qubits
         self.n_ancilla = n_ancilla
         self.n_tot_qubits = n_data_qubits + n_ancilla
 
-        self.image_width, self.image_height = image_shape[0], image_shape[1]
-        self.n_pixels = training_config.N_PIXELS
+        self.n_patches = n_patches
+        self.patch_width, self.patch_height = patch_shape[0], patch_shape[1]
+        self.pixels_per_patch = pixels_per_patch
 
-        actual_n_pixels = self.image_width * self.image_height
-        if actual_n_pixels != self.n_pixels:
-            raise ValueError(f"Mismatch in the number of pixels: expected {self.n_pixels}, "
-                             f"but got {actual_n_pixels}(width: {self.image_width}, height:"
-                             f" {self.image_height}).")
+        # Note: patch width is assumed  to be 28 (width of the whole image)
+        if self.patch_width != 28:
+            raise ValueError(f"patch_width must be equal to 28, the original MNIST image width. "
+                             f"Given patch width = {self.patch_width}")
 
-        self.n_patches = training_config.N_PATCHES
-        self.pixels_per_patch = int(self.n_pixels/self.n_patches)
-        self.patch_width = training_config.PATCH_WIDTH
-        self.patch_height = training_config.PATCH_HEIGHT
-        if self.patch_height*self.patch_width*self.n_patches != actual_n_pixels:
-            raise ValueError(f"Mismatch in the number of total pixels and how they are "
-                             f"distributed among patches.\n"
-                             f"Number of total pixels:  {actual_n_pixels}   \n"
-                             f"Number of total patches: {self.n_patches}    \n"
-                             f"Individual patch width:  {self.patch_width}  \n"
-                             f"Individual patch height: {self.patch_height} \n")
+        calculated_pixels_patch = self.patch_width * self.patch_height
+        if self.pixels_per_patch != calculated_pixels_patch:
+            raise ValueError(f"Mismatch in the number of pixels per patch (expected"
+                             f": {self.pixels_per_patch}, but got {calculated_pixels_patch} (width:"
+                             f" {self.patch_width}, height:"
+                             f" {self.patch_height}).")
 
         self.batch_size = batch_size
         self.classes = classes
@@ -191,14 +199,57 @@ class Qes:
 
         print('Initial quantum circuit: \n', self.ind)
 
+        print(f"""
+        Initialized Qes instance with parameters:
+        - n_data_qubits: {self.n_data_qubits}
+        - n_ancilla: {self.n_ancilla}
+        - n_tot_qubits: {self.n_tot_qubits}
+        - n_patches: {self.n_patches}
+        - patch_width: {self.patch_width}
+        - patch_height: {self.patch_height}
+        - pixels_per_patch: {self.pixels_per_patch}
+        - batch_size: {self.batch_size}
+        - classes: {self.classes}
+        - critic_net: {self.critic_net}
+        - fitness_function: '{self.fitness_function}'
+        - n_children: {self.n_children}
+        - n_max_evaluations: {self.n_max_evaluations}
+        - shots: {self.shots}
+        - simulator: '{self.simulator}'
+        - gpu: {self.gpu}
+        - device: '{self.device}'
+        - noise: {self.noise}
+        - dtheta: {self.dtheta}
+        - action_weights: {self.action_weights}
+        - multi_action_pb: {self.multi_action_pb}
+        - max_gen_no_improvement: {self.max_gen_no_improvement}
+        - n_generations: {self.n_generations}
+        - latent_vector_0 (first few values): {self.latent_vector_0[:5]}... # Truncated for brevity
+        - max_depth: {self.max_depth}
+        - output directory: {self.output_dir}
+        """)
 
     def preload_real_images_batches(self, n_batches=10):
+        """
+        Pre-loads a specified number of image batches from the mnist dataset, with the given
+        classes. Crops the images to only keep as many pixels as there are in one patch (top
+        patch) and discards the rest. Adds the cropped image to a list. This list of cropped
+        image batches is then used by the cost function to guide the evolutionary ansatz search
+        (distance between these pre-loaded images and generated images is minimized).
+
+        :param n_batches: int. The number of image batches to preload. Defaults to 10.
+        :return: list. A list of preloaded and cropped image batches.
+        """
+        # TODO: currently only loads the top patch if patches. Might be okay but think about it.
         print("Pre-loading real image batches")
-        dataset = select_from_dataset(load_mnist(image_size=self.image_width), 1000, self.classes)
+        # Patch width is assumed to be 28. This is checked in __init__
+        dataset = select_from_dataset(load_mnist(image_size=self.patch_width), 1000, self.classes)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=1)
         real_images_batches = []
         for i, (real_images, _) in enumerate(dataloader):
-            real_images_batches.append(real_images.to(self.device))
+            target_height = self.patch_height
+            cropped_images = real_images[:, :, :target_height, :]
+            real_images_batches.append(cropped_images.to(self.device))
             if i + 1 == n_batches:  # Stop after preloading n_batches
                 break
         return real_images_batches
@@ -230,6 +281,7 @@ class Qes:
             angle1 = random.random() * 2 * math.pi
             angle2 = random.random() * 2 * math.pi
             angle3 = random.random() * 2 * math.pi
+            # TODO: include a choose gate argument to choose which system to use
             # gate_list = [qc.rx, qc.ry, qc.rz, qc.rxx, qc.ryy, qc.rzz]
             # gate_dict = {'rx': RXGate, 'ry': RYGate, 'rz': RZGate,
             #              'rxx': RXXGate, 'ryy': RYYGate, 'rzz': RZZGate}
@@ -371,7 +423,7 @@ class Qes:
 
         for j in range(len(self.population)):
             qc = self.population[j].copy()
-            resulting_image = np.zeros(self.n_pixels)
+            resulting_image = np.zeros(self.pixels_per_patch)
 
             # Set up the type of simulator we want to use
             if self.simulator == 'qasm':  # TODO: reintegrate qasm
@@ -389,14 +441,22 @@ class Qes:
                 #     p[index] = Decimal(str(counts[i])) / Decimal(str(self.shots))
 
             elif self.simulator == 'statevector':
-                resulting_image = from_patches_to_image(quantum_circuit=qc,
-                                                        n_tot_qubits=self.n_tot_qubits,
-                                                        n_ancillas=self.n_ancilla,
-                                                        n_patches=self.n_patches,
-                                                        pixels_per_patch=self.pixels_per_patch,
-                                                        patch_width=self.patch_width,
-                                                        patch_height=self.patch_height,
-                                                        sim=self.sim)
+                if self.n_patches > 1:
+                    resulting_image = from_probs_to_pixels(quantum_circuit=qc,
+                                                           n_tot_qubits=self.n_tot_qubits,
+                                                           n_ancillas=self.n_ancilla,
+                                                           sim=self.sim)[
+                                      :self.pixels_per_patch]
+                    resulting_image = torch.reshape(torch.from_numpy(resulting_image),(1, self.patch_height, self.patch_width))
+                else:
+                    resulting_image = from_patches_to_image(quantum_circuit=qc,
+                                                            n_tot_qubits=self.n_tot_qubits,
+                                                            n_ancillas=self.n_ancilla,
+                                                            n_patches=self.n_patches,
+                                                            pixels_per_patch=self.pixels_per_patch,
+                                                            patch_width=self.patch_width,
+                                                            patch_height=self.patch_height,
+                                                            sim=self.sim)
 
             if self.current_gen == 0:
                 self.best_solution.append(resulting_image)
@@ -595,7 +655,8 @@ class Qes:
                 # Save best image every 10 generations
                 if g % 10 == 0:
                     image_filename = os.path.join(self.output_dir, f"best_solution_{g}.png")
-                    save_tensor(tensor=self.best_solution[-1].squeeze(),
+                    save_tensor(tensor=self.best_solution[-1].squeeze().view(self.patch_height,
+                                                                             self.patch_width),
                                 filename=image_filename)
 
                 print('best qc:\n_qubits', self.ind)
@@ -644,7 +705,7 @@ class Qes:
         metadata = {
             "N Data Qubits": self.n_data_qubits,
             "N Ancilla": self.n_ancilla,
-            "Image Shape": (self.image_width, self.image_height),
+            "Image Shape": (self.patch_width, self.patch_height),
             "Batch Size": self.batch_size,
             "N Children": self.n_children,
             "Max Evaluations": self.n_max_evaluations,

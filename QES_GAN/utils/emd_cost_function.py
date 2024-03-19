@@ -6,8 +6,8 @@ from statistics import mean
 from torch.utils.data import DataLoader
 
 from QuantumEvolutionaryAlgorithms.QES_GAN.utils.dataset import load_mnist, select_from_dataset
-from QuantumEvolutionaryAlgorithms.QES_GAN.networks.generator_methods import from_patches_to_image
-
+from QuantumEvolutionaryAlgorithms.QES_GAN.networks.generator_methods import \
+    from_patches_to_image, from_probs_to_pixels
 
 def emd_scoring_function(real_images_preloaded, batch_size, qc,
                          n_tot_qubits, n_ancillas, n_patches,
@@ -34,19 +34,30 @@ def emd_scoring_function(real_images_preloaded, batch_size, qc,
     :return: float. The Earth Mover's Distance between the real and generated images.
     """
     generated_images_list = []
-    for batch_index in range(batch_size):
-        generated_image = from_patches_to_image(quantum_circuit=qc,
-                                                n_tot_qubits=n_tot_qubits,
-                                                n_ancillas=n_ancillas,
-                                                n_patches=n_patches,
-                                                pixels_per_patch=pixels_per_patch,
-                                                patch_width=patch_width,
-                                                patch_height=patch_height,
-                                                sim=sim)
-        generated_images_list.append(generated_image)
+    if n_patches > 1:
+        for batch_index in range(batch_size):
+            generated_image = from_probs_to_pixels(quantum_circuit=qc,
+                                                   n_tot_qubits=n_tot_qubits,
+                                                   n_ancillas=n_ancillas,
+                                                   sim=sim)[:pixels_per_patch]
+
+            generated_image = generated_image.reshape(1, patch_height, patch_width)
+            generated_images_list.append(generated_image)
+
+    else:
+        for batch_index in range(batch_size):
+            generated_image = from_patches_to_image(quantum_circuit=qc,
+                                                    n_tot_qubits=n_tot_qubits,
+                                                    n_ancillas=n_ancillas,
+                                                    n_patches=n_patches,
+                                                    pixels_per_patch=pixels_per_patch,
+                                                    patch_width=patch_width,
+                                                    patch_height=patch_height,
+                                                    sim=sim)
+            generated_images_list.append(generated_image)
 
     real_images_tensor = real_images_preloaded
-    generated_images_tensor = torch.stack(generated_images_list)
+    generated_images_tensor = torch.stack([torch.from_numpy(image).float() for image in generated_images_list])
 
     real_images_flat = real_images_tensor.view(real_images_tensor.size(0), -1)
     generated_images_flat = generated_images_tensor.view(generated_images_tensor.size(0), -1)
@@ -56,6 +67,5 @@ def emd_scoring_function(real_images_preloaded, batch_size, qc,
 
     distance_real_gen = scipy.stats.wasserstein_distance(real_images_flat_np.flatten(),
                                                          generated_images_flat_np.flatten())
-
 
     return distance_real_gen
