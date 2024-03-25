@@ -20,7 +20,6 @@ from utils.dataset import select_from_dataset, load_mnist
 from utils.plotting import save_tensor
 from configs import training_config
 
-# np.random.seed(123)  # for replicability
 
 # TODO: for now hard coded to only consider the first patch.
 # might consider later to include either different patches at random, to avoid overfitting and
@@ -63,7 +62,8 @@ class Qes:
         :param action_weights: list. Probability to choose between the 4 possible actions. Their
         sum must be 100.
         :param multi_action_pb: float. Probability to get multiple actions in the same generation.
-        :param max_gen_no_improvement: integer. Number of generations with no improvements after which some changes will be applied
+        :param max_gen_no_improvement: integer. Number of generations with no improvements after
+        which some changes will be applied
         :keyword max_depth: integer. It fixes an upper bound on the quantum circuits depth.
         """
         # Error handling
@@ -76,12 +76,13 @@ class Qes:
         self.n_data_qubits = n_data_qubits
         self.n_ancilla = n_ancilla
         self.n_tot_qubits = n_data_qubits + n_ancilla
-
         self.n_patches = n_patches
         self.patch_width, self.patch_height = patch_shape[0], patch_shape[1]
         self.pixels_per_patch = pixels_per_patch
 
         # Note: patch width is assumed  to be 28 (width of the whole image)
+        # This choice is based on finding of the PQWGAN paper, where they observed that
+        # horizontal patches worked well for the structure.
         if self.patch_width != 28:
             raise ValueError(f"patch_width must be equal to 28, the original MNIST image width. "
                              f"Given patch width = {self.patch_width}")
@@ -96,7 +97,6 @@ class Qes:
         self.batch_size = batch_size
         self.classes = classes
         self.critic_net = critic_net
-
         self.fitness_function = fitness_function
         self.n_children = n_children
         self.n_max_evaluations = n_max_evaluations
@@ -112,6 +112,7 @@ class Qes:
 
         if self.simulator == 'statevector':
             self.noise = False
+
         if self.noise:
             backend = FakeMumbaiV2()
             self.sim = AerSimulator.from_backend(backend)
@@ -131,7 +132,7 @@ class Qes:
         #######################
 
         # Number of the computational basis states in the `n_qubits` qubits Hilbert space
-        self.N = 2 ** self.n_tot_qubits
+        # self.N = 2 ** self.n_tot_qubits  # TODO: delete if not needed
 
         ### START 0-GEN CIRCUIT ###
         self.latent_vector_0 = np.random.rand(self.n_tot_qubits)
@@ -214,6 +215,7 @@ class Qes:
         - fitness_function: '{self.fitness_function}'
         - n_children: {self.n_children}
         - n_max_evaluations: {self.n_max_evaluations}
+        - n_generations: {self.n_generations}
         - shots: {self.shots}
         - simulator: '{self.simulator}'
         - gpu: {self.gpu}
@@ -223,9 +225,6 @@ class Qes:
         - action_weights: {self.action_weights}
         - multi_action_pb: {self.multi_action_pb}
         - max_gen_no_improvement: {self.max_gen_no_improvement}
-        - n_generations: {self.n_generations}
-        - latent_vector_0 (first few values): {self.latent_vector_0[:5]}... # Truncated for brevity
-        - max_depth: {self.max_depth}
         - output directory: {self.output_dir}
         """)
 
@@ -705,7 +704,7 @@ class Qes:
         metadata = {
             "N Data Qubits": self.n_data_qubits,
             "N Ancilla": self.n_ancilla,
-            "Image Shape": (self.patch_width, self.patch_height),
+            "Image Shape": (self.patch_height, self.patch_width),
             "Batch Size": self.batch_size,
             "N Children": self.n_children,
             "Max Evaluations": self.n_max_evaluations,
