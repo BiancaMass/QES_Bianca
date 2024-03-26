@@ -34,37 +34,48 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f'\nUsing {device} as a device\n')
 
+    # Initialize a dictionary to hold arguments for Qes
+    qes_args = {
+        'n_data_qubits': n_data_qubits,
+        'n_ancilla': n_ancilla,
+        'patch_shape': patch_shape,
+        'pixels_per_patch': n_pixels_patch,
+        'batch_size': batch_size,
+        'classes': classes,
+        'n_children': n_children,
+        'fitness_function': fitness_function,
+        'n_patches': n_patches,
+        'n_max_evaluations': n_max_evaluations,
+        'shots': shots,
+        'simulator': simulator,
+        'noise': noise,
+        'gpu': gpu,
+        'device': device,
+        'dtheta': dtheta,
+        'action_weights': action_weights,
+        'multi_action_pb': multi_action_pb,
+        'max_gen_no_improvement': max_gen_no_improvements,
+        'max_depth': max_depth
+    }
 
-    print(f'Using device: {device}')
-    critic_net = ClassicalCritic(image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
-    critic_net = critic_net.to(device)
-    current_working_directory = os.getcwd()
-    critic_net_path = current_working_directory + '/input/' + "critic_300_classic.pt"
-    print(f'critic net path: {critic_net_path}')
-    # Import pre-trained critic net
-    critic_net.load_state_dict(torch.load(critic_net_path, map_location=device))
+    if fitness_function == 'critic':
+        print('loading critic net')
+        critic_net = ClassicalCritic(
+            image_shape=(training_config.IMAGE_SIDE, training_config.IMAGE_SIDE))
+        critic_net = critic_net.to(device)
+        current_working_directory = os.getcwd()
+        critic_net_path = os.path.join(current_working_directory, 'input', "critic_300_classic.pt")
+        print(f'critic net path: {critic_net_path}')
+        # Import pre-trained critic net
+        critic_net.load_state_dict(torch.load(critic_net_path, map_location=device))
+        qes_args['critic_net'] = critic_net
+    elif fitness_function == 'emd':
+        print('Selected emd as fitness function')
+    else:
+        raise AttributeError(
+            'Please select "critic" or "emd as fitness functions in the configuration file."')
 
-    qes = qes_gan.Qes(n_data_qubits=n_data_qubits,
-                      n_ancilla=n_ancilla,
-                      patch_shape=patch_shape,
-                      pixels_per_patch=n_pixels_patch,
-                      batch_size=batch_size,
-                      classes=classes,
-                      critic_net=critic_net,
-                      n_children=n_children,
-                      fitness_function=fitness_function,
-                      n_patches=n_patches,
-                      n_max_evaluations=n_max_evaluations,
-                      shots=shots,
-                      simulator=simulator,
-                      noise=noise,
-                      gpu=gpu,
-                      device=device,
-                      dtheta=dtheta,
-                      action_weights=action_weights,
-                      multi_action_pb=multi_action_pb,
-                      max_gen_no_improvement=max_gen_no_improvements,
-                      max_depth=max_depth)
+    qes = qes_gan.Qes(**qes_args)
 
     qes.data()
 

@@ -31,11 +31,11 @@ class Qes:
     """
 
     def __init__(self, n_data_qubits, n_ancilla, patch_shape, pixels_per_patch,
-                 batch_size, classes, critic_net,
+                 batch_size, classes,
                  n_children, fitness_function, n_patches, n_max_evaluations,
                  shots, simulator, noise, gpu, device,
                  dtheta, action_weights, multi_action_pb,
-                 max_gen_no_improvement,
+                 max_gen_no_improvement, critic_net=None,
                  **kwargs):
 
         """ Initialization of the population and its settings
@@ -45,7 +45,6 @@ class Qes:
         :param batch_size: int. Batch size to evaluate a qc (how many times to call it for the
         fitness)
         :param classes: list. The classes of images for the dataset e.g., [0,1] for mnist
-        :param critic_net: pre-trained critic (classical).
         :param n_children: integer. Number of children for each generation.
         :param fitness_function: str. What function to use for fitness, either 'emd' or 'critic'.
         :param n_patches: number of patches that the 28x28 image is divided into. The
@@ -64,6 +63,7 @@ class Qes:
         :param multi_action_pb: float. Probability to get multiple actions in the same generation.
         :param max_gen_no_improvement: integer. Number of generations with no improvements after
         which some changes will be applied
+        :param critic_net: pre-trained critic (classical). Optional.
         :keyword max_depth: integer. It fixes an upper bound on the quantum circuits depth.
         """
         # Error handling
@@ -96,7 +96,8 @@ class Qes:
 
         self.batch_size = batch_size
         self.classes = classes
-        self.critic_net = critic_net
+        if critic_net:
+            self.critic_net = critic_net
         self.fitness_function = fitness_function
         self.n_children = n_children
         self.n_max_evaluations = n_max_evaluations
@@ -211,7 +212,6 @@ class Qes:
         - pixels_per_patch: {self.pixels_per_patch}
         - batch_size: {self.batch_size}
         - classes: {self.classes}
-        - critic_net: {self.critic_net}
         - fitness_function: '{self.fitness_function}'
         - n_children: {self.n_children}
         - n_max_evaluations: {self.n_max_evaluations}
