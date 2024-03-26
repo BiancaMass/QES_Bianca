@@ -1,5 +1,6 @@
 QES_GAN/datasets
 QES_GAN/output
+QES_GAN/venv1
 QES_GAN/input
 QES_GAN/tests/datasets
 QES_GAN/utils/datasets
